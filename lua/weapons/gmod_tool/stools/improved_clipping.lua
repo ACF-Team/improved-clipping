@@ -12,7 +12,6 @@ TOOL.Information = {
 }
 
 local ConVarDefaults = {
-	["physical_clip"]     = "1",
 	["keep_mass"]         = "1",
 	["seal_holes"]        = "1",
 	["add_undo"]          = "1",
@@ -40,7 +39,7 @@ end
 
 if CLIENT then
 	language.Add("tool.improved_clipping.name", "Improved Clipping")
-	language.Add("tool.improved_clipping.desc", "Applies visual/physical clips to props, changing their visuals/geometry")
+	language.Add("tool.improved_clipping.desc", "Applies physical clips to props, changing their visuals/geometry")
 
 	language.Add("tool.improved_clipping.left0", "Define clipping planes. Last 2 planes used.")
 	language.Add("tool.improved_clipping.left1", "Define clipping plane")
@@ -49,9 +48,6 @@ if CLIENT then
 	language.Add("tool.improved_clipping.reload0", "Clear all clips on selected entity")
 
 	function TOOL.BuildCPanel(Panel)
-		local PhysicalClip = Panel:CheckBox("Physical clip", "improved_clipping_physical_clip")
-		PhysicalClip:SetTooltip("Also clip the entity's physics mesh, not just its visual mesh")
-
 		local KeepMass = Panel:CheckBox("Keep mass when physics clipping", "improved_clipping_keep_mass")
 		KeepMass:SetTooltip("Preserve the entity's original mass after its physics mesh is clipped")
 

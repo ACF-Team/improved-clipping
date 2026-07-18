@@ -1,4 +1,4 @@
 ImprovedClipping = ImprovedClipping or {}
 
-local MaxPhysics = CreateConVar("improved_clipping_max_physics", "2", FCVAR_ARCHIVE, "Max physical clips a entity can have", 0, 8)
+local MaxClips = CreateConVar("improved_clipping_max_clips", "8", FCVAR_ARCHIVE, "Max physical clips a entity can have", 0, 8)
 
