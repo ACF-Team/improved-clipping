@@ -2,6 +2,9 @@
 
 Clipping tool with both visual and physical support.
 
+Visuals are baked clipped render meshes (with sealed cut faces) drawn in the
+entity's place, rather than per-frame render clip planes.
+
 Additional support for special entities such as primitives.
 
 API:

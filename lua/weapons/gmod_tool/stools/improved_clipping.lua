@@ -52,7 +52,7 @@ if CLIENT then
 		KeepMass:SetTooltip("Preserve the entity's original mass after its physics mesh is clipped")
 
 		local SealHoles = Panel:CheckBox("Seal holes", "improved_clipping_seal_holes")
-		SealHoles:SetTooltip("Cap the cut surface so the clipped entity doesn't appear hollow")
+		SealHoles:SetTooltip("Cap the cut surface of new clips so the clipped entity doesn't appear hollow")
 
 		local AddUndo = Panel:CheckBox("Add clips to undo list", "improved_clipping_add_undo")
 		AddUndo:SetTooltip("Allow clips made with this tool to be reverted with the undo command (Z)")
@@ -170,7 +170,8 @@ function TOOL:RightClick(Trace)
 	local Distance = Normal:Dot(Entity:WorldToLocal(WorldPoint))
 
 	local KeepMass = self:GetClientNumber("keep_mass", 1) ~= 0
-	local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { KeepMass })
+	local Seal = self:GetClientNumber("seal_holes", 1) ~= 0
+	local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { KeepMass }, { Seal })
 
 	if next(IDs) and self:GetClientNumber("add_undo", 1) ~= 0 then
 		undo.Create("Improved Clipping")

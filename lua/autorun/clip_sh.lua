@@ -4,7 +4,7 @@ ImprovedClipping.ClippedEntities = ImprovedClipping.ClippedEntities or {}
 local MaxClips = CreateConVar("improved_clipping_max_clips", "8", bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED), "Max clips a entity can have", 0, 8)
 
 -- Clips are stored in entity-local space on Ent.ImprovedClipping:
---   Clips = { { ID, Normal, Distance, KeepMass }, ... } -- geometry on the Normal side is kept
+--   Clips = { { ID, Normal, Distance, KeepMass, Seal }, ... } -- geometry on the Normal side is kept
 --   OriginalConvexes, Mass, Volume                      -- captured before the first clip
 
 ----------------------------------------
@@ -14,13 +14,41 @@ local function IsAbovePlane(Point, Normal, Distance)
 	return Normal:Dot(Point) > Distance
 end
 
+-- Where the segment crosses the plane, and the fraction along A -> B it does so at
 local function IntersectLinePlane(A, B, Normal, Distance)
 	local Direction = B - A
 	local Dot = Normal:Dot(Direction)
 
 	if math.abs(Dot) < 1e-6 then return end
 
-	return A + Direction * ((Distance - Normal:Dot(A)) / Dot)
+	local Fraction = math.Clamp((Distance - Normal:Dot(A)) / Dot, 0, 1)
+
+	return A + Direction * Fraction, Fraction
+end
+
+-- Builds the vertex sitting Fraction of the way from V1 to V2, interpolating render attributes
+local function LerpVertex(V1, V2, Pos, Fraction)
+	local Normal = LerpVector(Fraction, V1.normal, V2.normal)
+	Normal:Normalize()
+
+	local Vertex = {
+		pos = Pos,
+		normal = Normal,
+		u = Lerp(Fraction, V1.u, V2.u),
+		v = Lerp(Fraction, V1.v, V2.v),
+	}
+
+	local UD1, UD2 = V1.userdata, V2.userdata
+	if UD1 and UD2 then
+		Vertex.userdata = {
+			Lerp(Fraction, UD1[1], UD2[1]),
+			Lerp(Fraction, UD1[2], UD2[2]),
+			Lerp(Fraction, UD1[3], UD2[3]),
+			UD1[4],
+		}
+	end
+
+	return Vertex
 end
 
 local function PushTriangle(Result, A, B, C)
@@ -30,52 +58,156 @@ local function PushTriangle(Result, A, B, C)
 	Result[i + 2] = C
 end
 
--- Clips a triangle soup (flat vertex array, 3 per triangle) against a plane,
--- keeping the geometry on the side the normal points toward.
-local function ClipTriangles(Vertices, Normal, Distance)
-	local Result = {}
+-- Orthonormal basis of the plane, Right x Up == Normal
+local function PlaneBasis(Normal)
+	local Right = (math.abs(Normal.z) < 0.9 and Vector(0, 0, 1) or Vector(1, 0, 0)):Cross(Normal)
+	Right:Normalize()
+
+	return Right, Normal:Cross(Right)
+end
+
+-- Texels per unit of the source mesh, so cap geometry matches the skin's texture scale
+local function TexelDensity(Vertices)
+	local UVArea, WorldArea = 0, 0
 
 	for i = 1, #Vertices - 2, 3 do
 		local V1, V2, V3 = Vertices[i], Vertices[i + 1], Vertices[i + 2]
-		local A1 = IsAbovePlane(V1, Normal, Distance)
-		local A2 = IsAbovePlane(V2, Normal, Distance)
-		local A3 = IsAbovePlane(V3, Normal, Distance)
+
+		WorldArea = WorldArea + (V2.pos - V1.pos):Cross(V3.pos - V1.pos):Length()
+		UVArea = UVArea + math.abs((V2.u - V1.u) * (V3.v - V1.v) - (V2.v - V1.v) * (V3.u - V1.u))
+	end
+
+	if WorldArea < 1e-6 or UVArea < 1e-6 then return 1 / 64 end
+
+	return math.sqrt(UVArea / WorldArea)
+end
+
+-- Caps the hole the clip opened up by fanning the cut points around their centroid
+local function CapHole(Result, Cut, Normal, Source)
+	if #Cut < 3 then return end
+
+	local CapNormal = -Normal
+	local Right, Up = PlaneBasis(CapNormal)
+
+	local Centroid = Vector(0, 0, 0)
+	for _, Pos in ipairs(Cut) do
+		Centroid = Centroid + Pos
+	end
+	Centroid = Centroid * (1 / #Cut)
+
+	-- Descending, because Source winds front faces clockwise about the normal. Points
+	-- come back twice and pair into slivers too thin to see.
+	local Points = {}
+	for i, Pos in ipairs(Cut) do
+		local Offset = Pos - Centroid
+		Points[i] = { Pos = Pos, Angle = math.atan2(Up:Dot(Offset), Right:Dot(Offset)) }
+	end
+
+	table.sort(Points, function(A, B) return A.Angle > B.Angle end)
+
+	local Density = TexelDensity(Source)
+	local Tangent = { Right.x, Right.y, Right.z, 1 }
+
+	local function CapVertex(Pos)
+		return {
+			pos = Pos,
+			normal = CapNormal,
+			u = Right:Dot(Pos) * Density,
+			v = Up:Dot(Pos) * Density,
+			userdata = Tangent,
+		}
+	end
+
+	local Hub = CapVertex(Centroid)
+
+	for i = 1, #Points do
+		local A = CapVertex(Points[i].Pos)
+		local B = CapVertex(Points[i == #Points and 1 or i + 1].Pos)
+
+		PushTriangle(Result, Hub, A, B)
+	end
+end
+
+-- Clips a triangle soup (flat vertex array, 3 per triangle) against a plane,
+-- keeping the geometry on the side the normal points toward.
+--
+-- Textured means the vertices are util.GetModelMeshes structs ({ pos, normal, u, v,
+-- userdata }) instead of bare Vectors, and cut vertices interpolate those attributes.
+-- Cap then seals the hole along the plane. Physics passes neither.
+local function ClipTriangles(Vertices, Normal, Distance, Textured, Cap)
+	local Result = {}
+	local Cut = (Textured and Cap) and {} or nil
+
+	for i = 1, #Vertices - 2, 3 do
+		local V1, V2, V3 = Vertices[i], Vertices[i + 1], Vertices[i + 2]
+		local P1, P2, P3
+		if Textured then
+			P1, P2, P3 = V1.pos, V2.pos, V3.pos
+		else
+			P1, P2, P3 = V1, V2, V3
+		end
+
+		local A1 = IsAbovePlane(P1, Normal, Distance)
+		local A2 = IsAbovePlane(P2, Normal, Distance)
+		local A3 = IsAbovePlane(P3, Normal, Distance)
 		local AboveCount = (A1 and 1 or 0) + (A2 and 1 or 0) + (A3 and 1 or 0)
 
 		if AboveCount == 3 then
 			PushTriangle(Result, V1, V2, V3)
 		elseif AboveCount == 2 then
 			-- Clips to a quad, split into two triangles. VC is the vertex below the plane.
-			local VA, VB, VC
-			if not A1 then VA, VB, VC = V2, V3, V1
-			elseif not A2 then VA, VB, VC = V3, V1, V2
-			else VA, VB, VC = V1, V2, V3 end
+			local VA, VB, VC, PA, PB, PC
+			if not A1 then VA, VB, VC, PA, PB, PC = V2, V3, V1, P2, P3, P1
+			elseif not A2 then VA, VB, VC, PA, PB, PC = V3, V1, V2, P3, P1, P2
+			else VA, VB, VC, PA, PB, PC = V1, V2, V3, P1, P2, P3 end
 
-			local PCA = IntersectLinePlane(VC, VA, Normal, Distance)
-			local PCB = IntersectLinePlane(VC, VB, Normal, Distance)
+			local PosCA, FracCA = IntersectLinePlane(PC, PA, Normal, Distance)
+			local PosCB, FracCB = IntersectLinePlane(PC, PB, Normal, Distance)
 
-			if PCA and PCB then
+			if PosCA and PosCB then
+				local PCA = Textured and LerpVertex(VC, VA, PosCA, FracCA) or PosCA
+				local PCB = Textured and LerpVertex(VC, VB, PosCB, FracCB) or PosCB
+
 				PushTriangle(Result, VA, VB, PCB)
 				PushTriangle(Result, VA, PCB, PCA)
+
+				if Cut then
+					Cut[#Cut + 1] = PosCA
+					Cut[#Cut + 1] = PosCB
+				end
 			end
 		elseif AboveCount == 1 then
 			-- Clips to a smaller triangle. VA is the vertex above the plane.
-			local VA, VB, VC
-			if A1 then VA, VB, VC = V1, V2, V3
-			elseif A2 then VA, VB, VC = V2, V3, V1
-			else VA, VB, VC = V3, V1, V2 end
+			local VA, VB, VC, PA, PB, PC
+			if A1 then VA, VB, VC, PA, PB, PC = V1, V2, V3, P1, P2, P3
+			elseif A2 then VA, VB, VC, PA, PB, PC = V2, V3, V1, P2, P3, P1
+			else VA, VB, VC, PA, PB, PC = V3, V1, V2, P3, P1, P2 end
 
-			local PAB = IntersectLinePlane(VA, VB, Normal, Distance)
-			local PAC = IntersectLinePlane(VA, VC, Normal, Distance)
+			local PosAB, FracAB = IntersectLinePlane(PA, PB, Normal, Distance)
+			local PosAC, FracAC = IntersectLinePlane(PA, PC, Normal, Distance)
 
-			if PAB and PAC then
+			if PosAB and PosAC then
+				local PAB = Textured and LerpVertex(VA, VB, PosAB, FracAB) or PosAB
+				local PAC = Textured and LerpVertex(VA, VC, PosAC, FracAC) or PosAC
+
 				PushTriangle(Result, VA, PAB, PAC)
+
+				if Cut then
+					Cut[#Cut + 1] = PosAC
+					Cut[#Cut + 1] = PosAB
+				end
 			end
 		end
 	end
 
+	if Cut then
+		CapHole(Result, Cut, Normal, Vertices)
+	end
+
 	return Result
 end
+
+ImprovedClipping.ClipTriangles = ClipTriangles
 
 ----------------------------------------
 -- Physics rebuilding
@@ -226,7 +358,7 @@ function ImprovedClipping.ClipsLeft(Ent)
 	return math.max(0, MaxClips:GetInt() - (State and #State.Clips or 0))
 end
 
--- Returns a copy of the entity's clips: { { ID, Normal, Distance, KeepMass }, ... }
+-- Returns a copy of the entity's clips: { { ID, Normal, Distance, KeepMass, Seal }, ... }
 function ImprovedClipping.GetClips(Ent)
 	local Clips = {}
 	local State = IsValid(Ent) and Ent.ImprovedClipping
@@ -238,6 +370,7 @@ function ImprovedClipping.GetClips(Ent)
 			Normal = Vector(Clip.Normal),
 			Distance = Clip.Distance,
 			KeepMass = Clip.KeepMass,
+			Seal = Clip.Seal,
 		}
 	end
 
@@ -265,7 +398,7 @@ function ImprovedClipping.SetClips(Ent, Clips)
 			duplicator.ClearEntityModifier(Ent, "improved_clipping")
 			ImprovedClipping.Sync(Ent)
 		else
-			Ent.RenderOverride = State.RenderOverride
+			ImprovedClipping.UpdateVisuals(Ent)
 		end
 
 		return true
@@ -292,11 +425,6 @@ function ImprovedClipping.SetClips(Ent, Clips)
 		Ent.ImprovedClipping = State
 		ImprovedClipping.ClippedEntities[Ent] = true
 
-		if CLIENT then
-			State.RenderOverride = Ent.RenderOverride
-			Ent.RenderOverride = ImprovedClipping.RenderOverride
-		end
-
 		Ent:CallOnRemove("improved_clipping", function(Removed)
 			ImprovedClipping.ClippedEntities[Removed] = nil
 			if SERVER then ImprovedClipping.SyncRemoval(Removed:EntIndex()) end
@@ -317,13 +445,17 @@ function ImprovedClipping.SetClips(Ent, Clips)
 	end
 	State.NextID = NextID
 
-	if SERVER then ImprovedClipping.Sync(Ent) end
+	if SERVER then
+		ImprovedClipping.Sync(Ent)
+	else
+		ImprovedClipping.UpdateVisuals(Ent)
+	end
 
 	return true
 end
 
 -- Adds clips (entity-local planes), rebuilding the physics object once. Returns the added IDs.
-function ImprovedClipping.AddClips(Ent, Normals, Distances, KeepMasses)
+function ImprovedClipping.AddClips(Ent, Normals, Distances, KeepMasses, Seals)
 	local IDs = {}
 	if not IsValid(Ent) then return IDs end
 
@@ -346,6 +478,7 @@ function ImprovedClipping.AddClips(Ent, Normals, Distances, KeepMasses)
 			Normal = Normals[i],
 			Distance = Distances[i],
 			KeepMass = not KeepMasses or KeepMasses[i] ~= false,
+			Seal = not Seals or Seals[i] ~= false,
 		}
 
 		NextID = NextID + 1

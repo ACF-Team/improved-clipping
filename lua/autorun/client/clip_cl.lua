@@ -2,49 +2,167 @@ ImprovedClipping = ImprovedClipping or {}
 
 ----------------------------------------
 -- Rendering
+--
+-- Instead of pushing render clip planes every frame, the clipped render mesh is baked
+-- once into an IMesh and drawn by an invisible clientside proxy entity in the real
+-- entity's place.
 
-local render_EnableClipping = render.EnableClipping
-local render_CullMode = render.CullMode
-local render_PushCustomClipPlane = render.PushCustomClipPlane
-local render_PopCustomClipPlane = render.PopCustomClipPlane
+-- Meshes are indexed with 16 bit indices. No prop should come near this.
+local MAX_MESH_VERTICES = 65535
 
--- Tool client convar, registered when the tool loads, so it must be fetched lazily
-local SealHoles
-local function ShouldSealHoles()
-	SealHoles = SealHoles or GetConVar("improved_clipping_seal_holes")
-	return not SealHoles or SealHoles:GetBool()
+-- Clipped entity -> the clientside entity that draws its mesh
+local Proxies = {}
+
+local function DestroyMesh(Proxy)
+	-- nil when never built, false for a model we couldn't build one from
+	if Proxy.ClipMesh then
+		Proxy.ClipMesh.Mesh:Destroy()
+	end
+
+	Proxy.ClipMesh = nil
 end
 
--- RenderOverride installed on clipped entities by SetClips
-function ImprovedClipping.RenderOverride(self)
-	local State = self.ImprovedClipping
-	if not State then return self:DrawModel() end
+-- Cuts the model's render mesh along every clip plane and bakes it into an IMesh.
+-- GetRenderMesh takes one mesh and one material, so the submeshes are merged and the
+-- model's first material covers the lot.
+--
+-- Returns false if there's nothing we can build, which the caller caches so we don't
+-- retry util.GetModelMeshes every frame.
+local function BuildMesh(Ent)
+	local Meshes = util.GetModelMeshes(Ent:GetModel())
+	if not Meshes then return false end
 
-	local Clips = State.Clips
-	local Previous = render_EnableClipping(true)
-	local Pos = self:GetPos()
-	local Ang = self:GetAngles()
+	local Clips = Ent.ImprovedClipping.Clips
+	local Triangles = {}
 
-	for _, Clip in ipairs(Clips) do
-		local Normal = Vector(Clip.Normal)
-		Normal:Rotate(Ang)
+	for _, Submesh in ipairs(Meshes) do
+		local Vertices = Submesh.triangles
 
-		render_PushCustomClipPlane(Normal, Normal:Dot(Pos) + Clip.Distance)
+		for _, Clip in ipairs(Clips) do
+			Vertices = ImprovedClipping.ClipTriangles(Vertices, Clip.Normal, Clip.Distance, true, Clip.Seal ~= false)
+			if not Vertices[1] then break end
+		end
+
+		for _, Vertex in ipairs(Vertices) do
+			Triangles[#Triangles + 1] = Vertex
+		end
 	end
 
-	self:DrawModel()
+	if #Triangles > MAX_MESH_VERTICES then
+		ErrorNoHalt(string.format(
+			"Improved Clipping: %s clips to %d vertices, over the %d a mesh can hold. Drawing it unclipped.\n",
+			Ent:GetModel(), #Triangles, MAX_MESH_VERTICES
+		))
 
-	if ShouldSealHoles() then
-		render_CullMode(MATERIAL_CULLMODE_CW)
-		self:DrawModel()
-		render_CullMode(MATERIAL_CULLMODE_CCW)
+		return false
 	end
 
-	for _ = 1, #Clips do
-		render_PopCustomClipPlane()
+	local IMesh = Mesh()
+
+	-- Clipped away to nothing; an unbuilt mesh is still a valid one to hand over
+	if Triangles[1] then
+		IMesh:BuildFromTriangles(Triangles)
 	end
 
-	render_EnableClipping(Previous)
+	return { Mesh = IMesh, Material = Material(Meshes[1].material) }
+end
+
+-- Only DrawModel reads GetRenderMesh, and the engine never calls it for a prop, so the
+-- mesh lives on a scripted clientside proxy entity where it does get read
+local function GetRenderMesh(self)
+	local Ent = self.ClipParent
+	if not IsValid(Ent) or not Ent.ImprovedClipping then return end
+
+	local RenderMesh = self.ClipMesh
+	if RenderMesh == nil then
+		RenderMesh = BuildMesh(Ent)
+		self.ClipMesh = RenderMesh
+	end
+
+	-- Nothing to hand over; the proxy draws the model unclipped
+	if RenderMesh == false then return end
+
+	return RenderMesh
+end
+
+-- The clipped entity draws nothing, the proxy stands in for it. Preferred over
+-- SetNoDraw, which the tool's preview toggles for its own reasons.
+local function RenderOverride() end
+
+-- The proxy only looks like the entity if it's told everything the entity knows
+local function SyncProxy(Ent, Proxy)
+	local Color = Ent:GetColor()
+	local Opaque = Color.a == 255
+
+	Proxy:SetColor(Color)
+	Proxy:SetMaterial(Ent:GetMaterial())
+	Proxy:SetRenderMode(Opaque and RENDERMODE_NORMAL or RENDERMODE_TRANSCOLOR)
+
+	-- Translucency is drawn in a later pass than opaque geometry
+	Proxy.RenderGroup = Opaque and RENDERGROUP_OPAQUE or RENDERGROUP_BOTH
+end
+
+local function RemoveProxy(Ent)
+	local Proxy = Proxies[Ent]
+	if not Proxy then return end
+
+	Proxies[Ent] = nil
+
+	if IsValid(Proxy) then
+		DestroyMesh(Proxy)
+		Proxy:Remove()
+	end
+end
+
+local function CreateProxy(Ent)
+	local Proxy = ents.CreateClientside("base_anim")
+	Proxy:SetModel(Ent:GetModel())
+	Proxy:SetPos(Ent:GetPos())
+	Proxy:SetAngles(Ent:GetAngles())
+	Proxy:Spawn()
+	Proxy:Activate()
+	Proxy:SetParent(Ent)
+
+	Proxy.ClipParent = Ent
+	Proxy.GetRenderMesh = GetRenderMesh
+
+	SyncProxy(Ent, Proxy)
+
+	Proxies[Ent] = Proxy
+end
+
+-- Nothing tells us when an entity is coloured or painted, so keep the proxy in step
+hook.Add("Think", "improved_clipping_visual", function()
+	for Ent, Proxy in pairs(Proxies) do
+		if not IsValid(Ent) or not IsValid(Proxy) then
+			RemoveProxy(Ent)
+		else
+			SyncProxy(Ent, Proxy)
+		end
+	end
+end)
+
+-- Called by SetClips whenever the entity's clips change in any way
+function ImprovedClipping.UpdateVisuals(Ent)
+	if Ent.ImprovedClipping then
+		if Ent.RenderOverride ~= RenderOverride then
+			Ent.RenderOverridePreClipping = Ent.RenderOverride
+			Ent.RenderOverride = RenderOverride
+		end
+
+		local Proxy = Proxies[Ent]
+		if IsValid(Proxy) then
+			-- Rebuilt against the new clips on the next draw
+			DestroyMesh(Proxy)
+		else
+			CreateProxy(Ent)
+		end
+	else
+		RemoveProxy(Ent)
+
+		Ent.RenderOverride = Ent.RenderOverridePreClipping
+		Ent.RenderOverridePreClipping = nil
+	end
 end
 
 ----------------------------------------
@@ -91,6 +209,7 @@ net.Receive("improved_clipping", function()
 			ID = net.ReadUInt(32),
 			Normal = Vector(net.ReadFloat(), net.ReadFloat(), net.ReadFloat()),
 			Distance = net.ReadFloat(),
+			Seal = net.ReadBool(),
 			KeepMass = true,
 		}
 	end

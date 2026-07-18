@@ -17,6 +17,7 @@ local function SendClips(Ent, Target)
 		net.WriteFloat(Clip.Normal.y)
 		net.WriteFloat(Clip.Normal.z)
 		net.WriteFloat(Clip.Distance)
+		net.WriteBool(Clip.Seal ~= false)
 	end
 
 	net.Send(Target or player.GetHumans())
@@ -38,11 +39,12 @@ function ImprovedClipping.Sync(Ent)
 		local State = Ent.ImprovedClipping
 
 		if State then
-			local Normals, Distances, KeepMasses = {}, {}, {}
+			local Normals, Distances, KeepMasses, Seals = {}, {}, {}, {}
 			for i, Clip in ipairs(State.Clips) do
 				Normals[i] = Clip.Normal
 				Distances[i] = Clip.Distance
 				KeepMasses[i] = Clip.KeepMass
+				Seals[i] = Clip.Seal
 			end
 
 			local PhysObj = Ent:GetPhysicsObject()
@@ -51,6 +53,7 @@ function ImprovedClipping.Sync(Ent)
 				Normals = Normals,
 				Distances = Distances,
 				KeepMasses = KeepMasses,
+				Seals = Seals,
 				OriginalMass = State.Mass,
 				Mass = IsValid(PhysObj) and PhysObj:GetMass() or nil,
 			})
@@ -74,7 +77,7 @@ duplicator.RegisterEntityModifier("improved_clipping", function(Player, Ent, Dat
 	timer.Simple(0, function()
 		if not IsValid(Ent) then return end
 
-		ImprovedClipping.AddClips(Ent, Data.Normals, Data.Distances, Data.KeepMasses)
+		ImprovedClipping.AddClips(Ent, Data.Normals, Data.Distances, Data.KeepMasses, Data.Seals)
 
 		local State = Ent.ImprovedClipping
 		if State and Data.OriginalMass then
