@@ -12,7 +12,6 @@ TOOL.Information = {
 }
 
 local ConVarDefaults = {
-	["max_visual_client"] = "8",
 	["physical_clip"]     = "1",
 	["keep_mass"]         = "1",
 	["seal_holes"]        = "1",
@@ -50,9 +49,6 @@ if CLIENT then
 	language.Add("tool.improved_clipping.reload0", "Clear all clips on selected entity")
 
 	function TOOL.BuildCPanel(Panel)
-		local MaxVisualClips = Panel:NumSlider("Max Visual Clips", "improved_clipping_max_visual_client", 1, 8, 0)
-		MaxVisualClips:SetTooltip("The maximum number of visual clips that can be applied to a single entity")
-
 		local PhysicalClip = Panel:CheckBox("Physical clip", "improved_clipping_physical_clip")
 		PhysicalClip:SetTooltip("Also clip the entity's physics mesh, not just its visual mesh")
 
