@@ -162,21 +162,24 @@ function TOOL:RightClick(Trace)
 
 	local Owner = self:GetOwner()
 	local Invert = Owner:KeyDown(IN_WALK) and -1 or 1
-	local Normal = self.Normal * Invert
-	local Offset = self:GetClientNumber("offset") * Invert
-	local Distance = self.Normal:Dot(Entity:GetPos() - self.Pos) * Invert - Offset
 
-	-- local KeepMass = self:GetClientNumber("keep_mass", 1) ~= 0
-	-- local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { KeepMass })
+	-- The preview plane in entity-local space, normal facing the kept (green) half
+	local WorldNormal = self.Normal * -Invert
+	local WorldPoint = self.Pos - self.Normal * self:GetClientNumber("offset")
+	local Normal = Entity:WorldToLocal(Entity:GetPos() + WorldNormal)
+	local Distance = Normal:Dot(Entity:WorldToLocal(WorldPoint))
 
-	-- if next(IDs) and self:GetClientNumber("add_undo", 1) ~= 0 then
-	-- 	undo.Create("Improved Clipping")
-	-- 	undo.AddFunction(function(_, UndoEntity, UndoIDs)
-	-- 		if IsValid(UndoEntity) then ImprovedClipping.RemoveClips(UndoEntity, UndoIDs) end
-	-- 	end, Entity, IDs)
-	-- 	undo.SetPlayer(Owner)
-	-- 	undo.Finish()
-	-- end
+	local KeepMass = self:GetClientNumber("keep_mass", 1) ~= 0
+	local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { KeepMass })
+
+	if next(IDs) and self:GetClientNumber("add_undo", 1) ~= 0 then
+		undo.Create("Improved Clipping")
+		undo.AddFunction(function(_, UndoEntity, UndoIDs)
+			if IsValid(UndoEntity) then ImprovedClipping.RemoveClips(UndoEntity, UndoIDs) end
+		end, Entity, IDs)
+		undo.SetPlayer(Owner)
+		undo.Finish()
+	end
 
 	return true
 end
@@ -187,7 +190,7 @@ function TOOL:Reload(Trace)
 	local Entity = GetClippingTarget(self:GetOwner(), Trace)
 	if not Entity then return false end
 
-	-- ImprovedClipping.Reset(Entity)
+	ImprovedClipping.Reset(Entity)
 
 	return true
 end
