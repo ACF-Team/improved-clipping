@@ -50,20 +50,31 @@ if CLIENT then
 	language.Add("tool.improved_clipping.reload0", "Clear all clips on selected entity")
 
 	function TOOL.BuildCPanel(Panel)
-		Panel:NumSlider("Max Visual Clips", "improved_clipping_max_visual_client", 1, 8, 0)
+		local MaxVisualClips = Panel:NumSlider("Max Visual Clips", "improved_clipping_max_visual_client", 1, 8, 0)
+		MaxVisualClips:SetTooltip("The maximum number of visual clips that can be applied to a single entity")
 
-		Panel:CheckBox("Physical clip", "improved_clipping_physical_clip")
-		Panel:CheckBox("Keep mass when physics clipping", "improved_clipping_keep_mass")
-		Panel:CheckBox("Seal holes", "improved_clipping_seal_holes")
-		Panel:CheckBox("Add clips to undo list", "improved_clipping_add_undo")
+		local PhysicalClip = Panel:CheckBox("Physical clip", "improved_clipping_physical_clip")
+		PhysicalClip:SetTooltip("Also clip the entity's physics mesh, not just its visual mesh")
 
-		local Mode = Panel:ComboBox("Mode", "improved_clipping_mode")
+		local KeepMass = Panel:CheckBox("Keep mass when physics clipping", "improved_clipping_keep_mass")
+		KeepMass:SetTooltip("Preserve the entity's original mass after its physics mesh is clipped")
+
+		local SealHoles = Panel:CheckBox("Seal holes", "improved_clipping_seal_holes")
+		SealHoles:SetTooltip("Cap the cut surface so the clipped entity doesn't appear hollow")
+
+		local AddUndo = Panel:CheckBox("Add clips to undo list", "improved_clipping_add_undo")
+		AddUndo:SetTooltip("Allow clips made with this tool to be reverted with the undo command (Z)")
+
+		local Mode = Panel:ComboBox("Plane Mode", "improved_clipping_mode")
+		Mode:SetTooltip("How the clipping plane is determined from your hits")
 		Mode:AddChoice("Dual Hitplane Intersection", 0)
 		Mode:AddChoice("Single Hitplane", 1)
 
-		Panel:NumSlider("Offset", "improved_clipping_offset", -10, 10, 2)
+		local Offset = Panel:NumSlider("Plane Offset", "improved_clipping_offset", -10, 10, 2)
+		Offset:SetTooltip("Shifts the clipping plane along its normal by this many units")
 
 		local ResetButton = Panel:Button("Reset Values")
+		ResetButton:SetTooltip("Reset all of the above options to their default values")
 		function ResetButton:DoClick()
 			for Name, Default in pairs(ConVarDefaults) do
 				RunConsoleCommand("improved_clipping_" .. Name, Default)
