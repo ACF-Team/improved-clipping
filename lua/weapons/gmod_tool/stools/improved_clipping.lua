@@ -23,6 +23,22 @@ local ConVarDefaults = {
 
 for Name, Default in pairs(ConVarDefaults) do TOOL.ClientConVar[Name] = Default end
 
+-- Returns the entity hit by Trace if Player has the improved clipping tool equipped and active.
+local function GetClippingTarget(Player, Trace)
+	if not IsValid(Player) then return end
+
+	local Weapon = Player:GetActiveWeapon()
+	if not IsValid(Weapon) or Weapon:GetClass() ~= "gmod_tool" then return end
+
+	local Tool = Player:GetTool()
+	if not Tool or Tool ~= Player:GetTool("improved_clipping") then return end
+
+	local Entity = Trace and Trace.Entity
+	if not IsValid(Entity) or Entity:IsWorld() then return end
+
+	return Entity
+end
+
 if CLIENT then
 	language.Add("tool.improved_clipping.name", "Improved Clipping")
 	language.Add("tool.improved_clipping.desc", "Applies visual/physical clips to props, changing their visuals/geometry")
@@ -42,8 +58,8 @@ if CLIENT then
 		Panel:CheckBox("Add clips to undo list", "improved_clipping_add_undo")
 
 		local Mode = Panel:ComboBox("Mode", "improved_clipping_mode")
-		Mode:AddChoice("2-Hitplanes Intersection", 0)
-		Mode:AddChoice("1-Hitplane", 1)
+		Mode:AddChoice("Dual Hitplane Intersection", 0)
+		Mode:AddChoice("Single Hitplane", 1)
 
 		Panel:NumSlider("Offset", "improved_clipping_offset", -10, 10, 2)
 
@@ -55,31 +71,17 @@ if CLIENT then
 		end
 	end
 
-	local OverlayColor = Color(0, 255, 0)
 	local OverlayMaterial = Material("models/debug/debugwhite")
 
-	-- Returns the entity under the crosshair if the improved clipping tool is the active tool.
-	local function GetOverlayTarget()
-		local Player = LocalPlayer()
-		local Weapon = Player:GetActiveWeapon()
-		if not IsValid(Weapon) or Weapon:GetClass() ~= "gmod_tool" then return end
-
-		local Tool = Player:GetTool()
-		if not Tool or Tool ~= Player:GetTool("improved_clipping") then return end
-
-		local Entity = Player:GetEyeTrace().Entity
-		if not IsValid(Entity) or Entity:IsWorld() then return end
-
-		return Entity
-	end
-
-	-- Draws overlay over this entity
+	-- Hides the real entity while we draw its clipped preview in its place
 	local HiddenEntity
 
 	hook.Add("PostDrawTranslucentRenderables", "ImprovedClipping_Overlay", function(bDrawingDepth, bDrawingSkybox)
 		if bDrawingDepth or bDrawingSkybox then return end
 
-		local Entity = GetOverlayTarget()
+		local Player = LocalPlayer()
+		local Trace = Player:GetEyeTrace()
+		local Entity = GetClippingTarget(Player, Trace)
 
 		if IsValid(HiddenEntity) and HiddenEntity ~= Entity then
 			HiddenEntity:SetNoDraw(false)
@@ -88,30 +90,77 @@ if CLIENT then
 
 		if not Entity then return end
 
+		local Tool = Player:GetTool("improved_clipping")
+		local Normal = Tool and Tool.Normal
+		local Pos = Tool and Tool.Pos
+		if not Normal or not Pos then return end
+
 		Entity:SetNoDraw(true)
 		HiddenEntity = Entity
 
-		render.MaterialOverride(OverlayMaterial)
-		render.SetColorModulation(OverlayColor.r / 255, OverlayColor.g / 255, OverlayColor.b / 255)
+		local Invert = Player:KeyDown(IN_WALK) and 1 or -1
+		local Offset = Tool:GetClientNumber("offset") * Invert
+		local Distance = Normal:Dot(Pos) * Invert
 
+		local WasClippingEnabled = render.EnableClipping(true)
+		render.MaterialOverride(OverlayMaterial)
+
+		render.PushCustomClipPlane(Normal * Invert, Distance - Offset)
+		render.SetColorModulation(0, 1, 0)
 		Entity:DrawModel()
+		render.PopCustomClipPlane()
+
+		render.PushCustomClipPlane(-Normal * Invert, -Distance + Offset)
+		render.SetColorModulation(1, 0, 0)
+		Entity:DrawModel()
+		render.PopCustomClipPlane()
 
 		render.MaterialOverride(nil)
+		render.EnableClipping(WasClippingEnabled)
 	end)
-elseif SERVER then
-
 end
 
+-- Runs in both realms so the pending clip plane is available immediately client-side for the preview.
 function TOOL:LeftClick(Trace)
-	if CLIENT then return true end
+	local Entity = GetClippingTarget(self:GetOwner(), Trace)
+	if not Entity then return false end
+
+	local op = self:GetOperation()
+	if op == 0 then
+		local Plane1 = { Origin = Trace.HitPos, Normal = Trace.HitNormal }
+		local Plane2 = self.LastPlane or Plane1
+		self.LastPlane = Plane1
+
+		local LineNormal = Plane1.Normal:Cross(Plane2.Normal)
+		local LineLengthSqr = LineNormal:LengthSqr()
+
+		if LineLengthSqr > 1e-10 then -- Planes are not parallel
+			self.Normal = LineNormal:Cross(Plane1.Normal + Plane2.Normal):GetNormalized()
+			self.Pos = Plane1.Origin + LineNormal:Cross(Plane2.Normal) * Plane2.Normal:Dot(Plane2.Origin - Plane1.Origin) / LineLengthSqr
+		else
+			self.Normal = Trace.HitNormal
+			self.Pos = Trace.HitPos
+		end
+	elseif op == 1 then
+		self.Normal = Trace.HitNormal
+		self.Pos = Trace.HitPos
+	end
+
+	return true
 end
 
 function TOOL:RightClick(Trace)
 	if CLIENT then return true end
+
+	local Entity = GetClippingTarget(self:GetOwner(), Trace)
+	if not Entity then return false end
 end
 
 function TOOL:Reload(Trace)
 	if CLIENT then return true end
+
+	local Entity = GetClippingTarget(self:GetOwner(), Trace)
+	if not Entity then return false end
 end
 
 function TOOL:Think()
