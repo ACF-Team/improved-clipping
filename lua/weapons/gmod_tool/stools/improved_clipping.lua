@@ -105,7 +105,7 @@ if CLIENT then
 		Entity:SetNoDraw(true)
 		HiddenEntity = Entity
 
-		local Invert = Player:KeyDown(IN_WALK) and 1 or -1
+		local Invert = Player:KeyDown(IN_WALK) and -1 or 1
 		local Offset = Tool:GetClientNumber("offset") * Invert
 		local Distance = Normal:Dot(Pos) * Invert
 
@@ -113,12 +113,12 @@ if CLIENT then
 		render.MaterialOverride(OverlayMaterial)
 
 		render.PushCustomClipPlane(Normal * Invert, Distance - Offset)
-		render.SetColorModulation(0, 1, 0)
+		render.SetColorModulation(1, 0, 0)
 		Entity:DrawModel()
 		render.PopCustomClipPlane()
 
 		render.PushCustomClipPlane(-Normal * Invert, -Distance + Offset)
-		render.SetColorModulation(1, 0, 0)
+		render.SetColorModulation(0, 1, 0)
 		Entity:DrawModel()
 		render.PopCustomClipPlane()
 
@@ -161,6 +161,28 @@ function TOOL:RightClick(Trace)
 
 	local Entity = GetClippingTarget(self:GetOwner(), Trace)
 	if not Entity then return false end
+
+	if not self.Normal or not self.Pos then return false end
+
+	local Owner = self:GetOwner()
+	local Invert = Owner:KeyDown(IN_WALK) and -1 or 1
+	local Normal = self.Normal * Invert
+	local Offset = self:GetClientNumber("offset") * Invert
+	local Distance = self.Normal:Dot(Entity:GetPos() - self.Pos) * Invert - Offset
+
+	-- local KeepMass = self:GetClientNumber("keep_mass", 1) ~= 0
+	-- local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { KeepMass })
+
+	-- if next(IDs) and self:GetClientNumber("add_undo", 1) ~= 0 then
+	-- 	undo.Create("Improved Clipping")
+	-- 	undo.AddFunction(function(_, UndoEntity, UndoIDs)
+	-- 		if IsValid(UndoEntity) then ImprovedClipping.RemoveClips(UndoEntity, UndoIDs) end
+	-- 	end, Entity, IDs)
+	-- 	undo.SetPlayer(Owner)
+	-- 	undo.Finish()
+	-- end
+
+	return true
 end
 
 function TOOL:Reload(Trace)
@@ -168,6 +190,10 @@ function TOOL:Reload(Trace)
 
 	local Entity = GetClippingTarget(self:GetOwner(), Trace)
 	if not Entity then return false end
+
+	-- ImprovedClipping.Reset(Entity)
+
+	return true
 end
 
 function TOOL:Think()

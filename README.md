@@ -6,7 +6,7 @@ Additional support for special entities such as primitives.
 
 TODO:
 - `ImprovedClipping.ClipsLeft(Ent)` [sh]
-    - Returns physical/visual clips remaining, depending on realm called on.
+    - Returns clips remaining, depending on realm called on.
 - `ImprovedClipping.AddClips(Ent, Normals, Distances, KeepMasses)` [sh]
     - Adds clips, modifies mesh and batch updates physics object once. Returns IDs.
 - `ImprovedClipping.RemoveClips(Ent, IDs)` [sh]
