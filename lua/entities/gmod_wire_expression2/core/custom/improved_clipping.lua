@@ -11,19 +11,6 @@ local function vec(v)
 	return Vector(v[1], v[2], v[3])
 end
 
--- Entity-local Normal/Distance of a clip matching the given world-space plane, or nil
-local function findclip(ent, origin, normal)
-	local LocalNormal, Distance = ImprovedClipping.WorldToLocalPlane(ent, vec(normal), vec(origin))
-
-	for _, Clip in ipairs(ImprovedClipping.GetClips(ent)) do
-		if Clip.Normal:Dot(LocalNormal) > 0.9999 and math.abs(Clip.Distance - Distance) < 0.1 then
-			return Clip.ID
-		end
-	end
-
-	return nil
-end
-
 ----------------------------------------
 -- Adding
 
@@ -37,22 +24,22 @@ local function addclip(self, ent, origin, normal, keepmass, seal)
 end
 
 __e2setcost(500)
-e2function number entity:addClip(vector origin, vector normal, number keepMass, number seal)
+e2function number entity:addMeshClip(vector origin, vector normal, number keepMass, number seal)
 	return addclip(self, this, origin, normal, keepMass ~= 0, seal ~= 0)
 end
 
-e2function number entity:addClip(vector origin, vector normal, number keepMass)
+e2function number entity:addMeshClip(vector origin, vector normal, number keepMass)
 	return addclip(self, this, origin, normal, keepMass ~= 0, true)
 end
 
-e2function number entity:addClip(vector origin, vector normal)
+e2function number entity:addMeshClip(vector origin, vector normal)
 	return addclip(self, this, origin, normal, true, true)
 end
 
 ----------------------------------------
 -- Removing
 
-e2function number entity:removeClips()
+e2function number entity:removeMeshClips()
 	local ent = this
 
 	if not checktool(ent, self) then return 0 end
@@ -60,7 +47,7 @@ e2function number entity:removeClips()
 	return ImprovedClipping.Reset(ent) and 1 or 0
 end
 
-e2function number entity:removeClip()
+e2function number entity:removeMeshClip()
 	local ent = this
 
 	if not checktool(ent, self) then return 0 end
@@ -68,7 +55,7 @@ e2function number entity:removeClip()
 	return ImprovedClipping.Reset(ent) and 1 or 0
 end
 
-e2function number entity:removeClip(number id)
+e2function number entity:removeMeshClip(number id)
 	local ent = this
 
 	if not checktool(ent, self) then return 0 end
@@ -76,45 +63,28 @@ e2function number entity:removeClip(number id)
 	return ImprovedClipping.RemoveClips(ent, { id }) and 1 or 0
 end
 
-e2function number entity:removeClipByID(number id)
+e2function number entity:removeMeshClipByID(number id)
 	local ent = this
 
 	if not checktool(ent, self) then return 0 end
 
 	return ImprovedClipping.RemoveClips(ent, { id }) and 1 or 0
-end
-
-e2function number entity:removeClip(vector origin, vector normal)
-	local ent = this
-
-	if not checktool(ent, self) then return 0 end
-
-	local ID = findclip(ent, origin, normal)
-	if not ID then return 0 end
-
-	return ImprovedClipping.RemoveClips(ent, { ID }) and 1 or 0
 end
 
 ----------------------------------------
 -- Other
 
 __e2setcost(20)
-e2function number entity:getClipID(vector origin, vector normal)
-	if not IsValid(this) then return -1 end
-
-	return findclip(this, origin, normal) or -1
-end
-
-e2function number entity:clipsLeft()
+e2function number entity:meshClipsLeft()
 	return ImprovedClipping.ClipsLeft(this)
 end
 
-e2function number entity:isClipped()
+e2function number entity:isMeshClipped()
 	return (IsValid(this) and this.ImprovedClipping) and 1 or 0
 end
 
 __e2setcost(50)
-e2function table entity:getClips()
+e2function table entity:getMeshClips()
 	local res = E2Lib.newE2Table()
 	if not IsValid(this) then return res end
 

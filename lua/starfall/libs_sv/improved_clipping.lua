@@ -29,19 +29,6 @@ local function checkclip(ent)
 	end
 end
 
--- Entity-local Normal/Distance of a clip matching the given world-space plane, or nil
-local function findclip(ent, origin, normal)
-	local LocalNormal, Distance = ImprovedClipping.WorldToLocalPlane(ent, vunwrap(normal), vunwrap(origin))
-
-	for _, Clip in ipairs(ImprovedClipping.GetClips(ent)) do
-		if Clip.Normal:Dot(LocalNormal) > 0.9999 and math.abs(Clip.Distance - Distance) < 0.1 then
-			return Clip.ID
-		end
-	end
-
-	return nil
-end
-
 -- --------------------------------------
 -- Methods
 
@@ -51,7 +38,7 @@ end
 -- @param keepMass Optional bool (default true), whether to preserve the entity's original mass
 -- @param seal Optional bool (default true), whether to cap the cut surface
 -- @return The new clip's ID, or 0 if it failed
-function ents_methods:addClip(origin, normal, keepMass, seal)
+function ents_methods:addMeshClip(origin, normal, keepMass, seal)
 	local ent = getent(self)
 	checkclip(ent)
 
@@ -66,7 +53,7 @@ end
 
 --- Removes all clips from the entity
 -- @return True if the entity had clips to remove
-function ents_methods:removeClips()
+function ents_methods:removeMeshClips()
 	local ent = getent(self)
 	checkclip(ent)
 
@@ -74,9 +61,9 @@ function ents_methods:removeClips()
 end
 
 --- Removes a clip from the entity given its ID
--- @param id The clip's ID, as returned by addClip or getClipID
+-- @param id The clip's ID, as returned by addMeshClip
 -- @return True if the clip was removed
-function ents_methods:removeClip(id)
+function ents_methods:removeMeshClip(id)
 	local ent = getent(self)
 	checkclip(ent)
 
@@ -85,48 +72,23 @@ function ents_methods:removeClip(id)
 	return ImprovedClipping.RemoveClips(ent, { id })
 end
 
---- Removes a clip from the entity given a plane it passes through
--- @param origin A point on the plane, in world space
--- @param normal The plane's normal, in world space
--- @return True if a matching clip was found and removed
-function ents_methods:removeClipByPlane(origin, normal)
-	local ent = getent(self)
-	checkclip(ent)
-
-	local id = findclip(ent, origin, normal)
-	if not id then return false end
-
-	return ImprovedClipping.RemoveClips(ent, { id })
-end
-
---- Returns the ID of the clip on the entity matching a given plane
--- @param origin A point on the plane, in world space
--- @param normal The plane's normal, in world space
--- @return The clip's ID, or nil if no matching clip exists
-function ents_methods:getClipID(origin, normal)
-	local ent = getent(self)
-	if not IsValid(ent) then SF.Throw("Entity is not valid.", 2) end
-
-	return findclip(ent, origin, normal)
-end
-
 --- Returns how many more clips can be added to the entity
 -- @return Count number
-function ents_methods:clipsLeft()
+function ents_methods:meshClipsLeft()
 	local ent = getent(self)
 	return ImprovedClipping.ClipsLeft(ent)
 end
 
 --- Returns whether the entity currently has any clips
 -- @return True if the entity is clipped
-function ents_methods:isClipped()
+function ents_methods:isMeshClipped()
 	local ent = getent(self)
 	return IsValid(ent) and ent.ImprovedClipping ~= nil
 end
 
 --- Returns the entity's clips
 -- @return Table array of clip data (id, normal, distance, keepMass, seal)
-function ents_methods:getClips()
+function ents_methods:getMeshClips()
 	local ent = getent(self)
 	if not IsValid(ent) then SF.Throw("Entity is not valid.", 2) end
 
