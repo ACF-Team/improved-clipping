@@ -9,6 +9,8 @@ TOOL.Information = {
 	{ name = "left1", stage = 0, op = 1 },
 	{ name = "right0", stage = 0 },
 	{ name = "reload0", stage = 0 },
+	{ name = "alt", stage = 0 },
+	{ name = "shift", stage = 0 },
 }
 
 local ConVarDefaults = {
@@ -46,6 +48,8 @@ if CLIENT then
 
 	language.Add("tool.improved_clipping.right0", "Add clip to selected entity")
 	language.Add("tool.improved_clipping.reload0", "Clear all clips on selected entity")
+	language.Add("tool.improved_clipping.alt", "Hold Alt to invert the clipping plane (cut the other side)")
+	language.Add("tool.improved_clipping.shift", "Hold Shift to preview clipped physics convexes and existing clip planes")
 
 	function TOOL.BuildCPanel(Panel)
 		local KeepMass = Panel:CheckBox("Keep mass when physics clipping", "improved_clipping_keep_mass")
