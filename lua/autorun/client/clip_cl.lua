@@ -142,6 +142,11 @@ hook.Add("Think", "improved_clipping_visual", function()
 	end
 end)
 
+-- The clientside proxy drawing Ent's clipped mesh, or nil
+function ImprovedClipping.GetProxy(Ent)
+	return Proxies[Ent]
+end
+
 -- Called by SetClips whenever the entity's clips change in any way. The server
 -- starts the sync by networking the clips; this completes it by updating visuals.
 function ImprovedClipping.Sync(Ent)

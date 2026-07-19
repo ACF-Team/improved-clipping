@@ -86,7 +86,11 @@ if CLIENT then
 		local Trace = Player:GetEyeTrace()
 		local Entity = GetClippingTarget(Player, Trace)
 
-		if IsValid(HiddenEntity) and HiddenEntity ~= Entity then
+		-- Draw the clip proxy if it exists, so existing clips show; else the model
+		local Proxy = IsValid(Entity) and ImprovedClipping.GetProxy(Entity)
+		local Target = IsValid(Proxy) and Proxy or Entity
+
+		if IsValid(HiddenEntity) and HiddenEntity ~= Target then
 			HiddenEntity:SetNoDraw(false)
 			HiddenEntity = nil
 		end
@@ -98,28 +102,34 @@ if CLIENT then
 		local Pos = Tool and Tool.Pos
 		if not Normal or not Pos then return end
 
-		Entity:SetNoDraw(true)
-		HiddenEntity = Entity
+		Target:SetNoDraw(true)
+		HiddenEntity = Target
 
 		local Invert = Player:KeyDown(IN_WALK) and -1 or 1
 		local Offset = Tool:GetClientNumber("offset") * Invert
 		local Distance = Normal:Dot(Pos) * Invert
+
+		-- DrawModel honours RenderOverride; clear it so our preview actually draws
+		local Override = Target.RenderOverride
+		Target.RenderOverride = nil
 
 		local WasClippingEnabled = render.EnableClipping(true)
 		render.MaterialOverride(OverlayMaterial)
 
 		render.PushCustomClipPlane(Normal * Invert, Distance - Offset)
 		render.SetColorModulation(1, 0, 0)
-		Entity:DrawModel()
+		Target:DrawModel()
 		render.PopCustomClipPlane()
 
 		render.PushCustomClipPlane(-Normal * Invert, -Distance + Offset)
 		render.SetColorModulation(0, 1, 0)
-		Entity:DrawModel()
+		Target:DrawModel()
 		render.PopCustomClipPlane()
 
 		render.MaterialOverride(nil)
 		render.EnableClipping(WasClippingEnabled)
+
+		Target.RenderOverride = Override
 	end)
 end
 
