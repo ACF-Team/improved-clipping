@@ -386,18 +386,20 @@ function ImprovedClipping.GetClips(Ent)
 	return Clips
 end
 
--- Replaces the entity's entire clip list and rebuilds the physics object once.
--- An empty list fully resets the entity.
+-- Replaces the entity's entire clip list, rebuilding the physics object once. An empty list
+-- fully resets the entity. Entities owning their own mesh skip the rebuild, so nothing can fail
+-- for them and this always succeeds; for everyone else a failed rebuild reverts and returns false.
 function ImprovedClipping.SetClips(Ent, Clips)
 	if not IsValid(Ent) then return false end
 
 	local State = Ent.ImprovedClipping
+	local External = Ent.ImprovedClippingExternalMesh
 
 	if not Clips[1] then
 		if not State then return true end
 
 		State.Clips = {}
-		RebuildPhysics(Ent)
+		if not External then RebuildPhysics(Ent) end
 
 		Ent.ImprovedClipping = nil
 		ImprovedClipping.ClippedEntities[Ent] = nil
@@ -405,27 +407,39 @@ function ImprovedClipping.SetClips(Ent, Clips)
 
 		if SERVER then duplicator.ClearEntityModifier(Ent, "improved_clipping") end
 		ImprovedClipping.Sync(Ent)
+		hook.Run("ImprovedClipping_ClipsChanged", Ent)
 
 		return true
 	end
 
 	if not State then
-		local PhysObj = Ent:GetPhysicsObject()
+		if External then
+			-- Only RebuildPhysics reads the mesh, mass and volume, and it never runs for these
+			State = {
+				Clips = {},
+				NextID = 1,
+				OriginalConvexes = {},
+				Mass = 0,
+				Volume = 0,
+			}
+		else
+			local PhysObj = Ent:GetPhysicsObject()
 
-		if CLIENT and not IsValid(PhysObj) then
-			Ent:PhysicsInit(SOLID_VPHYSICS)
-			PhysObj = Ent:GetPhysicsObject()
+			if CLIENT and not IsValid(PhysObj) then
+				Ent:PhysicsInit(SOLID_VPHYSICS)
+				PhysObj = Ent:GetPhysicsObject()
+			end
+
+			if not IsValid(PhysObj) then return false end
+
+			State = {
+				Clips = {},
+				NextID = 1,
+				OriginalConvexes = GetConvexes(PhysObj),
+				Mass = PhysObj:GetMass(),
+				Volume = PhysObj:GetVolume() or 0,
+			}
 		end
-
-		if not IsValid(PhysObj) then return false end
-
-		State = {
-			Clips = {},
-			NextID = 1,
-			OriginalConvexes = GetConvexes(PhysObj),
-			Mass = PhysObj:GetMass(),
-			Volume = PhysObj:GetVolume() or 0,
-		}
 
 		Ent.ImprovedClipping = State
 		ImprovedClipping.ClippedEntities[Ent] = true
@@ -439,7 +453,7 @@ function ImprovedClipping.SetClips(Ent, Clips)
 	local Old = State.Clips
 	State.Clips = Clips
 
-	if not RebuildPhysics(Ent) then
+	if not External and not RebuildPhysics(Ent) then
 		State.Clips = Old
 		return false
 	end
@@ -451,6 +465,7 @@ function ImprovedClipping.SetClips(Ent, Clips)
 	State.NextID = NextID
 
 	ImprovedClipping.Sync(Ent)
+	hook.Run("ImprovedClipping_ClipsChanged", Ent)
 
 	return true
 end
