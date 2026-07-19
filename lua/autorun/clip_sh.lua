@@ -349,6 +349,15 @@ local function RebuildPhysics(Ent)
 	return true
 end
 
+-- Converts a world-space plane (a direction and a point on the plane) into the
+-- entity-local Normal/Distance pair Clips are stored as
+function ImprovedClipping.WorldToLocalPlane(Ent, WorldNormal, WorldPoint)
+	local Normal = Ent:WorldToLocal(Ent:GetPos() + WorldNormal)
+	local Distance = Normal:Dot(Ent:WorldToLocal(WorldPoint))
+
+	return Normal, Distance
+end
+
 ----------------------------------------
 -- Public API
 

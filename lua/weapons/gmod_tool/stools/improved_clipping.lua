@@ -166,8 +166,7 @@ function TOOL:RightClick(Trace)
 	-- The preview plane in entity-local space, normal facing the kept (green) half
 	local WorldNormal = self.Normal * -Invert
 	local WorldPoint = self.Pos - self.Normal * self:GetClientNumber("offset")
-	local Normal = Entity:WorldToLocal(Entity:GetPos() + WorldNormal)
-	local Distance = Normal:Dot(Entity:WorldToLocal(WorldPoint))
+	local Normal, Distance = ImprovedClipping.WorldToLocalPlane(Entity, WorldNormal, WorldPoint)
 
 	local KeepMass = self:GetClientNumber("keep_mass", 1) ~= 0
 	local Seal = self:GetClientNumber("seal_holes", 1) ~= 0
