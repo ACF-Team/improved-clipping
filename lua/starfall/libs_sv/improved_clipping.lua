@@ -38,7 +38,7 @@ end
 -- @param keepMass Optional bool (default true), whether to preserve the entity's original mass
 -- @param seal Optional bool (default true), whether to cap the cut surface
 -- @return The new clip's ID, or 0 if it failed
-function ents_methods:addMeshClip(origin, normal, keepMass, seal)
+function ents_methods:addClip(origin, normal, keepMass, seal)
 	local ent = getent(self)
 	checkclip(ent)
 
@@ -53,7 +53,7 @@ end
 
 --- Removes all clips from the entity
 -- @return True if the entity had clips to remove
-function ents_methods:removeMeshClips()
+function ents_methods:removeClips()
 	local ent = getent(self)
 	checkclip(ent)
 
@@ -61,9 +61,9 @@ function ents_methods:removeMeshClips()
 end
 
 --- Removes a clip from the entity given its ID
--- @param id The clip's ID, as returned by addMeshClip
+-- @param id The clip's ID, as returned by addClip
 -- @return True if the clip was removed
-function ents_methods:removeMeshClip(id)
+function ents_methods:removeClip(id)
 	local ent = getent(self)
 	checkclip(ent)
 
@@ -74,21 +74,21 @@ end
 
 --- Returns how many more clips can be added to the entity
 -- @return Count number
-function ents_methods:meshClipsLeft()
+function ents_methods:clipsLeft()
 	local ent = getent(self)
 	return ImprovedClipping.ClipsLeft(ent)
 end
 
 --- Returns whether the entity currently has any clips
 -- @return True if the entity is clipped
-function ents_methods:isMeshClipped()
+function ents_methods:isClipped()
 	local ent = getent(self)
 	return IsValid(ent) and ent.ImprovedClipping ~= nil
 end
 
 --- Returns the entity's clips
 -- @return Table array of clip data (id, normal, distance, keepMass, seal)
-function ents_methods:getMeshClips()
+function ents_methods:getClips()
 	local ent = getent(self)
 	if not IsValid(ent) then SF.Throw("Entity is not valid.", 2) end
 

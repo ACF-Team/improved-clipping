@@ -24,22 +24,22 @@ local function addclip(self, ent, origin, normal, keepmass, seal)
 end
 
 __e2setcost(500)
-e2function number entity:addMeshClip(vector origin, vector normal, number keepMass, number seal)
+e2function number entity:addClip(vector origin, vector normal, number keepMass, number seal)
 	return addclip(self, this, origin, normal, keepMass ~= 0, seal ~= 0)
 end
 
-e2function number entity:addMeshClip(vector origin, vector normal, number keepMass)
+e2function number entity:addClip(vector origin, vector normal, number keepMass)
 	return addclip(self, this, origin, normal, keepMass ~= 0, true)
 end
 
-e2function number entity:addMeshClip(vector origin, vector normal)
+e2function number entity:addClip(vector origin, vector normal)
 	return addclip(self, this, origin, normal, true, true)
 end
 
 ----------------------------------------
 -- Removing
 
-e2function number entity:removeMeshClips()
+e2function number entity:removeClips()
 	local ent = this
 
 	if not checktool(ent, self) then return 0 end
@@ -47,7 +47,7 @@ e2function number entity:removeMeshClips()
 	return ImprovedClipping.Reset(ent) and 1 or 0
 end
 
-e2function number entity:removeMeshClip()
+e2function number entity:removeClip()
 	local ent = this
 
 	if not checktool(ent, self) then return 0 end
@@ -55,7 +55,7 @@ e2function number entity:removeMeshClip()
 	return ImprovedClipping.Reset(ent) and 1 or 0
 end
 
-e2function number entity:removeMeshClip(number id)
+e2function number entity:removeClip(number id)
 	local ent = this
 
 	if not checktool(ent, self) then return 0 end
@@ -63,7 +63,7 @@ e2function number entity:removeMeshClip(number id)
 	return ImprovedClipping.RemoveClips(ent, { id }) and 1 or 0
 end
 
-e2function number entity:removeMeshClipByID(number id)
+e2function number entity:removeClipByID(number id)
 	local ent = this
 
 	if not checktool(ent, self) then return 0 end
@@ -75,16 +75,16 @@ end
 -- Other
 
 __e2setcost(20)
-e2function number entity:meshClipsLeft()
+e2function number entity:clipsLeft()
 	return ImprovedClipping.ClipsLeft(this)
 end
 
-e2function number entity:isMeshClipped()
+e2function number entity:isClipped()
 	return (IsValid(this) and this.ImprovedClipping) and 1 or 0
 end
 
 __e2setcost(50)
-e2function table entity:getMeshClips()
+e2function table entity:getClips()
 	local res = E2Lib.newE2Table()
 	if not IsValid(this) then return res end
 
