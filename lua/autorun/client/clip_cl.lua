@@ -142,8 +142,9 @@ hook.Add("Think", "improved_clipping_visual", function()
 	end
 end)
 
--- Called by SetClips whenever the entity's clips change in any way
-function ImprovedClipping.UpdateVisuals(Ent)
+-- Called by SetClips whenever the entity's clips change in any way. The server
+-- starts the sync by networking the clips; this completes it by updating visuals.
+function ImprovedClipping.Sync(Ent)
 	if Ent.ImprovedClipping then
 		if Ent.RenderOverride ~= RenderOverride then
 			Ent.RenderOverridePreClipping = Ent.RenderOverride

@@ -403,12 +403,8 @@ function ImprovedClipping.SetClips(Ent, Clips)
 		ImprovedClipping.ClippedEntities[Ent] = nil
 		Ent:RemoveCallOnRemove("improved_clipping")
 
-		if SERVER then
-			duplicator.ClearEntityModifier(Ent, "improved_clipping")
-			ImprovedClipping.Sync(Ent)
-		else
-			ImprovedClipping.UpdateVisuals(Ent)
-		end
+		if SERVER then duplicator.ClearEntityModifier(Ent, "improved_clipping") end
+		ImprovedClipping.Sync(Ent)
 
 		return true
 	end
@@ -454,11 +450,7 @@ function ImprovedClipping.SetClips(Ent, Clips)
 	end
 	State.NextID = NextID
 
-	if SERVER then
-		ImprovedClipping.Sync(Ent)
-	else
-		ImprovedClipping.UpdateVisuals(Ent)
-	end
+	ImprovedClipping.Sync(Ent)
 
 	return true
 end
