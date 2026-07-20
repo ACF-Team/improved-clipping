@@ -66,7 +66,7 @@ local function BuildMesh(Ent)
 		local Vertices = Submesh.Triangles
 
 		for _, Clip in ipairs(Clips) do
-			Vertices = ImprovedClipping.ClipTriangles(Vertices, Clip.Normal, Clip.Distance, true, Clip.Seal ~= false, Submesh.Density)
+			Vertices = ImprovedClipping.ClipTriangles(Vertices, Clip.Normal, Clip.Distance, true, Clip.Seal, Submesh.Density)
 			if not Vertices[1] then break end
 		end
 

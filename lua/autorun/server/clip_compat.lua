@@ -5,7 +5,7 @@ ImprovedClipping = ImprovedClipping or {}
 --
 -- One way only. A pasted dupe is converted and its legacy modifiers dropped, so it re-saves as
 -- improved_clipping alone. Their per-clip physics flag is ignored and every clip becomes
--- physical; their inside flag is dropped rather than mapped onto Seal.
+-- physical; their inside flag is dropped and every clip comes in unsealed.
 
 -- Proper Clipping owns these modifier names while it's installed
 if ProperClipping then

@@ -17,7 +17,7 @@ local function SendClips(Ent, Target)
 		net.WriteFloat(Clip.Normal.y)
 		net.WriteFloat(Clip.Normal.z)
 		net.WriteFloat(Clip.Distance)
-		net.WriteBool(Clip.Seal ~= false)
+		net.WriteBool(Clip.Seal)
 	end
 
 	net.Send(Target or player.GetHumans())

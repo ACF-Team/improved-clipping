@@ -535,7 +535,7 @@ function ImprovedClipping.AddClips(Ent, Normals, Distances, KeepMasses, Seals)
 			Normal = Normals[i],
 			Distance = Distances[i],
 			KeepMass = not KeepMasses or KeepMasses[i] ~= false,
-			Seal = not Seals or Seals[i] ~= false,
+			Seal = Seals ~= nil and Seals[i] == true,
 		}
 
 		NextID = NextID + 1
