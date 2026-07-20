@@ -15,7 +15,7 @@ TOOL.Information = {
 
 local ConVarDefaults = {
 	["keep_mass"]         = "1",
-	["seal_holes"]        = "1",
+	["seal_holes"]        = "0",
 	["add_undo"]          = "1",
 	["mode"]              = "0",
 	["offset"]            = "0",
@@ -253,7 +253,7 @@ function TOOL:RightClick(Trace)
 	local Normal, Distance = ImprovedClipping.WorldToLocalPlane(Entity, WorldNormal, WorldPoint)
 
 	local KeepMass = self:GetClientNumber("keep_mass", 1) ~= 0
-	local Seal = self:GetClientNumber("seal_holes", 1) ~= 0
+	local Seal = self:GetClientNumber("seal_holes", 0) ~= 0
 	local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { KeepMass }, { Seal })
 
 	if next(IDs) and self:GetClientNumber("add_undo", 1) ~= 0 then

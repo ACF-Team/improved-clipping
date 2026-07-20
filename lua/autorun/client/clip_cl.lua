@@ -22,7 +22,7 @@ local function DestroyMesh(Proxy)
 	Proxy.ClipMesh = nil
 end
 
--- Model -> { Material, [i] = { Triangles, Density } }, or false for a model with no meshes.
+-- Model -> { Material, [i] = { Triangles, Density } }, or false for a model with no meshes
 local ModelCache = {}
 
 local function GetModelData(Model)
@@ -206,7 +206,11 @@ end
 
 -- Cached per entity index so clips survive clientside entity recreation
 local Cache = {}
+
+-- Index -> attempts. Clips that erase an entity's collision are refused every time, so retries
+-- are capped.
 local Pending = {}
+local MAX_ATTEMPTS = 50
 
 local function ApplyClips(Index)
 	local Ent = Entity(Index)
@@ -218,9 +222,18 @@ local function ApplyClips(Index)
 end
 
 timer.Create("improved_clipping_pending", 0.1, 0, function()
-	for Index in pairs(Pending) do
+	for Index, Attempts in pairs(Pending) do
 		if ApplyClips(Index) then
 			Pending[Index] = nil
+		elseif Attempts >= MAX_ATTEMPTS then
+			Pending[Index] = nil
+
+			ErrorNoHalt(string.format(
+				"Improved Clipping: gave up clipping entity %d after %d attempts. Drawing it unclipped.\n",
+				Index, MAX_ATTEMPTS
+			))
+		else
+			Pending[Index] = Attempts + 1
 		end
 	end
 end)
@@ -251,13 +264,13 @@ net.Receive("improved_clipping", function()
 	end
 
 	Cache[Index] = Clips
-	Pending[Index] = true
+	Pending[Index] = 1
 end)
 
 hook.Add("NetworkEntityCreated", "improved_clipping", function(Ent)
 	local Index = Ent:EntIndex()
 	if Cache[Index] then
-		Pending[Index] = true
+		Pending[Index] = 1
 	end
 end)
 
