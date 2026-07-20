@@ -23,6 +23,27 @@ local ConVarDefaults = {
 
 for Name, Default in pairs(ConVarDefaults) do TOOL.ClientConVar[Name] = Default end
 
+-- The clip plane comes off a trace, and each realm traces separately against its own collision
+-- mesh, so the client sends the plane it previewed and the server clips with that.
+if SERVER then
+	util.AddNetworkString("improved_clipping_plane")
+
+	net.Receive("improved_clipping_plane", function(_, Player)
+		local Tool = IsValid(Player) and Player:GetTool("improved_clipping")
+		if not Tool then return end
+
+		-- Floats, since net.WriteVector rounds off enough to skew an oblique plane
+		local Normal = Vector(net.ReadFloat(), net.ReadFloat(), net.ReadFloat())
+		local Pos = Vector(net.ReadFloat(), net.ReadFloat(), net.ReadFloat())
+
+		-- x ~= x is only true for nan
+		if Normal:IsZero() or Normal.x ~= Normal.x or Pos.x ~= Pos.x then return end
+
+		Tool.Normal = Normal:GetNormalized()
+		Tool.Pos = Pos
+	end)
+end
+
 -- Returns the entity hit by Trace if Player has the improved clipping tool equipped and active.
 local function GetClippingTarget(Player, Trace)
 	if not IsValid(Player) then return end
@@ -55,8 +76,9 @@ if CLIENT then
 		local KeepMass = Panel:CheckBox("Keep mass when physics clipping", "improved_clipping_keep_mass")
 		KeepMass:SetTooltip("Preserve the entity's original mass after its physics mesh is clipped")
 
-		local SealHoles = Panel:CheckBox("Seal holes", "improved_clipping_seal_holes")
+		local SealHoles = Panel:CheckBox("Seal holes (expensive?)", "improved_clipping_seal_holes")
 		SealHoles:SetTooltip("Cap the cut surface of new clips so the clipped entity doesn't appear hollow")
+		SealHoles:SetTextColor(Color(200, 0, 0))
 
 		local AddUndo = Panel:CheckBox("Add clips to undo list", "improved_clipping_add_undo")
 		AddUndo:SetTooltip("Allow clips made with this tool to be reverted with the undo command (Z)")
@@ -212,6 +234,12 @@ function TOOL:LeftClick(Trace)
 	local Entity = GetClippingTarget(self:GetOwner(), Trace)
 	if not Entity then return false end
 
+	-- The server takes its plane off the net message instead of tracing for its own
+	if SERVER then return true end
+
+	-- Prediction runs this more than once per click, which would advance LastPlane each time
+	if not IsFirstTimePredicted() then return true end
+
 	local op = self:GetOperation()
 	if op == 0 then
 		local Plane1 = { Origin = Trace.HitPos, Normal = Trace.HitNormal }
@@ -232,6 +260,17 @@ function TOOL:LeftClick(Trace)
 		self.Normal = Trace.HitNormal
 		self.Pos = Trace.HitPos
 	end
+
+	if not self.Normal or not self.Pos then return true end
+
+	net.Start("improved_clipping_plane")
+	net.WriteFloat(self.Normal.x)
+	net.WriteFloat(self.Normal.y)
+	net.WriteFloat(self.Normal.z)
+	net.WriteFloat(self.Pos.x)
+	net.WriteFloat(self.Pos.y)
+	net.WriteFloat(self.Pos.z)
+	net.SendToServer()
 
 	return true
 end
