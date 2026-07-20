@@ -82,28 +82,66 @@ local function TexelDensity(Vertices)
 	return math.sqrt(UVArea / WorldArea)
 end
 
--- Caps the hole the clip opened up by fanning the cut points around their centroid
+-- Convex hull of 2D points ({ X, Y, Pos }), counter-clockwise. Andrew's monotone
+-- chain, O(n log n): https://en.wikipedia.org/wiki/Convex_hull_algorithms
+-- Pseudocode: https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain
+--
+-- Returns the hull table and its length. The table keeps stale entries past that
+-- length, so read the count and never #Hull.
+local function ConvexHull(Points)
+	table.sort(Points, function(A, B)
+		if A.X ~= B.X then return A.X < B.X end
+		return A.Y < B.Y
+	end)
+
+	local function Cross(O, A, B)
+		return (A.X - O.X) * (B.Y - O.Y) - (A.Y - O.Y) * (B.X - O.X)
+	end
+
+	local Hull, N = {}, 0
+
+	-- Appends a point, first dropping any tail that makes a non-left turn. Floor keeps
+	-- the upper hull from eating the lower one.
+	local function Append(P, Floor)
+		while N > Floor and Cross(Hull[N - 1], Hull[N], P) <= 0 do
+			N = N - 1
+		end
+
+		N = N + 1
+		Hull[N] = P
+	end
+
+	-- Lower hull, left to right
+	for i = 1, #Points do
+		Append(Points[i], 1)
+	end
+
+	-- Upper hull, right to left. The rightmost point already sits at the end of the
+	-- lower hull, so start one short of it and keep it as the new floor.
+	local Floor = N
+	for i = #Points - 1, 1, -1 do
+		Append(Points[i], Floor)
+	end
+
+	return Hull, N - 1 -- The leftmost point closes the loop and repeats Hull[1]
+end
+
+-- Caps the hole the clip opened up by fanning the cut points' convex hull
 local function CapHole(Result, Cut, Normal, Source)
 	if #Cut < 3 then return end
 
 	local CapNormal = -Normal
-	local Right, Up = PlaneBasis(CapNormal)
+	-- Reversed, because Source winds front faces clockwise about the normal and the
+	-- hull comes back counter-clockwise in this basis
+	local Up, Right = PlaneBasis(CapNormal)
 
-	local Centroid = Vector(0, 0, 0)
-	for _, Pos in ipairs(Cut) do
-		Centroid = Centroid + Pos
-	end
-	Centroid = Centroid * (1 / #Cut)
-
-	-- Descending, because Source winds front faces clockwise about the normal. Points
-	-- come back twice and pair into slivers too thin to see.
-	local Points = {}
+	local Projected = {}
 	for i, Pos in ipairs(Cut) do
-		local Offset = Pos - Centroid
-		Points[i] = { Pos = Pos, Angle = math.atan2(Up:Dot(Offset), Right:Dot(Offset)) }
+		Projected[i] = { X = Right:Dot(Pos), Y = Up:Dot(Pos), Pos = Pos }
 	end
 
-	table.sort(Points, function(A, B) return A.Angle > B.Angle end)
+	local Points, Count = ConvexHull(Projected)
+	if Count < 3 then return end
 
 	local Density = TexelDensity(Source)
 	local Tangent = { Right.x, Right.y, Right.z, 1 }
@@ -118,13 +156,11 @@ local function CapHole(Result, Cut, Normal, Source)
 		}
 	end
 
-	local Hub = CapVertex(Centroid)
+	-- A convex polygon fans from any of its own vertices
+	local Hub = CapVertex(Points[1].Pos)
 
-	for i = 1, #Points do
-		local A = CapVertex(Points[i].Pos)
-		local B = CapVertex(Points[i == #Points and 1 or i + 1].Pos)
-
-		PushTriangle(Result, Hub, A, B)
+	for i = 2, Count - 1 do
+		PushTriangle(Result, Hub, CapVertex(Points[i].Pos), CapVertex(Points[i + 1].Pos))
 	end
 end
 
