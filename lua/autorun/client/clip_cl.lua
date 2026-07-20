@@ -22,6 +22,33 @@ local function DestroyMesh(Proxy)
 	Proxy.ClipMesh = nil
 end
 
+-- Model -> { Material, [i] = { Triangles, Density } }, or false for a model with no meshes.
+local ModelCache = {}
+
+local function GetModelData(Model)
+	local Data = ModelCache[Model]
+	if Data ~= nil then return Data end
+
+	local Meshes = util.GetModelMeshes(Model)
+
+	if Meshes then
+		Data = { Material = Material(Meshes[1].material) }
+
+		for i, Submesh in ipairs(Meshes) do
+			Data[i] = {
+				Triangles = Submesh.triangles,
+				Density = ImprovedClipping.TexelDensity(Submesh.triangles),
+			}
+		end
+	else
+		Data = false
+	end
+
+	ModelCache[Model] = Data
+
+	return Data
+end
+
 -- Cuts the model's render mesh along every clip plane and bakes it into an IMesh.
 -- GetRenderMesh takes one mesh and one material, so the submeshes are merged and the
 -- model's first material covers the lot.
@@ -29,17 +56,17 @@ end
 -- Returns false if there's nothing we can build, which the caller caches so we don't
 -- retry util.GetModelMeshes every frame.
 local function BuildMesh(Ent)
-	local Meshes = util.GetModelMeshes(Ent:GetModel())
-	if not Meshes then return false end
+	local Model = GetModelData(Ent:GetModel())
+	if not Model then return false end
 
 	local Clips = Ent.ImprovedClipping.Clips
 	local Triangles = {}
 
-	for _, Submesh in ipairs(Meshes) do
-		local Vertices = Submesh.triangles
+	for _, Submesh in ipairs(Model) do
+		local Vertices = Submesh.Triangles
 
 		for _, Clip in ipairs(Clips) do
-			Vertices = ImprovedClipping.ClipTriangles(Vertices, Clip.Normal, Clip.Distance, true, Clip.Seal ~= false)
+			Vertices = ImprovedClipping.ClipTriangles(Vertices, Clip.Normal, Clip.Distance, true, Clip.Seal ~= false, Submesh.Density)
 			if not Vertices[1] then break end
 		end
 
@@ -64,7 +91,7 @@ local function BuildMesh(Ent)
 		IMesh:BuildFromTriangles(Triangles)
 	end
 
-	return { Mesh = IMesh, Material = Material(Meshes[1].material) }
+	return { Mesh = IMesh, Material = Model.Material }
 end
 
 -- Only DrawModel reads GetRenderMesh, and the engine never calls it for a prop, so the

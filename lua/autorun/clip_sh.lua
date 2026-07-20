@@ -127,7 +127,7 @@ local function ConvexHull(Points)
 end
 
 -- Caps the hole the clip opened up by fanning the cut points' convex hull
-local function CapHole(Result, Cut, Normal, Source)
+local function CapHole(Result, Cut, Normal, Source, Density)
 	if #Cut < 3 then return end
 
 	local CapNormal = -Normal
@@ -143,7 +143,7 @@ local function CapHole(Result, Cut, Normal, Source)
 	local Points, Count = ConvexHull(Projected)
 	if Count < 3 then return end
 
-	local Density = TexelDensity(Source)
+	Density = Density or TexelDensity(Source)
 	local Tangent = { Right.x, Right.y, Right.z, 1 }
 
 	local function CapVertex(Pos)
@@ -170,7 +170,11 @@ end
 -- Textured means the vertices are util.GetModelMeshes structs ({ pos, normal, u, v,
 -- userdata }) instead of bare Vectors, and cut vertices interpolate those attributes.
 -- Cap then seals the hole along the plane. Physics passes neither.
-local function ClipTriangles(Vertices, Normal, Distance, Textured, Cap)
+--
+-- Density is the cap's texel density. Pass the source model's, measured once and cached;
+-- otherwise it's measured from Vertices, which for the second clip onward is already
+-- clipped geometry.
+local function ClipTriangles(Vertices, Normal, Distance, Textured, Cap, Density)
 	local Result = {}
 	local Cut = (Textured and Cap) and {} or nil
 
@@ -237,13 +241,14 @@ local function ClipTriangles(Vertices, Normal, Distance, Textured, Cap)
 	end
 
 	if Cut then
-		CapHole(Result, Cut, Normal, Vertices)
+		CapHole(Result, Cut, Normal, Vertices, Density)
 	end
 
 	return Result
 end
 
 ImprovedClipping.ClipTriangles = ClipTriangles
+ImprovedClipping.TexelDensity = TexelDensity
 
 ----------------------------------------
 -- Physics rebuilding
