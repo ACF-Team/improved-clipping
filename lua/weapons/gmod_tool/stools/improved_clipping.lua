@@ -23,25 +23,21 @@ local ConVarDefaults = {
 
 for Name, Default in pairs(ConVarDefaults) do TOOL.ClientConVar[Name] = Default end
 
--- The clip plane comes off a trace, and each realm traces separately against its own collision
--- mesh, so the client sends the plane it previewed and the server clips with that.
-if SERVER then
-	util.AddNetworkString("improved_clipping_plane")
+AddCSLuaFile("modules/visualizations.lua")
 
-	net.Receive("improved_clipping_plane", function(_, Player)
-		local Tool = IsValid(Player) and Player:GetTool("improved_clipping")
-		if not Tool then return end
+local function WritePlane(Normal, Pos)
+	net.WriteFloat(Normal.x)
+	net.WriteFloat(Normal.y)
+	net.WriteFloat(Normal.z)
+	net.WriteFloat(Pos.x)
+	net.WriteFloat(Pos.y)
+	net.WriteFloat(Pos.z)
+end
 
-		-- Floats, since net.WriteVector rounds off enough to skew an oblique plane
-		local Normal = Vector(net.ReadFloat(), net.ReadFloat(), net.ReadFloat())
-		local Pos = Vector(net.ReadFloat(), net.ReadFloat(), net.ReadFloat())
-
-		-- x ~= x is only true for nan
-		if Normal:IsZero() or Normal.x ~= Normal.x or Pos.x ~= Pos.x then return end
-
-		Tool.Normal = Normal:GetNormalized()
-		Tool.Pos = Pos
-	end)
+local function ReadPlane()
+	local Normal = Vector(net.ReadFloat(), net.ReadFloat(), net.ReadFloat())
+	local Pos = Vector(net.ReadFloat(), net.ReadFloat(), net.ReadFloat())
+	return Normal, Pos
 end
 
 -- Returns the entity hit by Trace if Player has the improved clipping tool equipped and active.
@@ -58,6 +54,30 @@ local function GetClippingTarget(Player, Trace)
 	if not IsValid(Entity) or Entity:IsWorld() then return end
 
 	return Entity
+end
+
+-- Shared by both realms to compute the clip plane
+local function ComputeClipPlane(Tool, Trace)
+	local op = Tool:GetOperation()
+
+	if op == 0 then
+		local Plane1 = { Origin = Trace.HitPos, Normal = Trace.HitNormal }
+		local Plane2 = Tool.LastPlane or Plane1
+		Tool.LastPlane = Plane1
+
+		local LineNormal = Plane1.Normal:Cross(Plane2.Normal)
+		local LineLengthSqr = LineNormal:LengthSqr()
+
+		if LineLengthSqr > 1e-10 then -- Planes are not parallel
+			local Normal = LineNormal:Cross(Plane1.Normal + Plane2.Normal):GetNormalized()
+			local Pos = Plane1.Origin + LineNormal:Cross(Plane2.Normal) * Plane2.Normal:Dot(Plane2.Origin - Plane1.Origin) / LineLengthSqr
+			return Normal, Pos
+		end
+
+		return Trace.HitNormal, Trace.HitPos
+	elseif op == 1 then
+		return Trace.HitNormal, Trace.HitPos
+	end
 end
 
 if CLIENT then
@@ -100,177 +120,38 @@ if CLIENT then
 		end
 	end
 
-	local EdgeColor = Color(255, 255, 255, 255)
+	include("modules/visualizations.lua")(GetClippingTarget)
 
-	local ConvexColors = {
-		Color(0, 255, 0),
-		Color(0, 0, 255),
-		Color(255, 255, 0),
-		Color(255, 0, 255),
-		Color(0, 255, 255),
-	}
+	net.Receive("improved_clipping_plane_sp", function()
+		local Tool = LocalPlayer():GetTool("improved_clipping")
+		if not Tool then return end
 
-	local function ConvexColor(Index)
-		local Col = ConvexColors[(Index - 1) % #ConvexColors + 1]
-		return Color(Col.r, Col.g, Col.b, 60)
-	end
-
-	-- The physics convex decomposition can differ from the render mesh, so draw it directly
-	local function DrawConvexes(Entity)
-		local PhysObj = Entity:GetPhysicsObject()
-		if not IsValid(PhysObj) then return end
-
-		local Convexes = PhysObj:GetMeshConvexes()
-		if not Convexes then return end
-
-		render.SetColorMaterial()
-
-		for Index, Convex in ipairs(Convexes) do
-			local Col = ConvexColor(Index)
-
-			for i = 1, #Convex - 2, 3 do
-				local A = PhysObj:LocalToWorld(Convex[i].pos)
-				local B = PhysObj:LocalToWorld(Convex[i + 1].pos)
-				local C = PhysObj:LocalToWorld(Convex[i + 2].pos)
-
-				render.DrawQuad(A, B, C, C, Col)
-
-				render.DrawLine(A, B, EdgeColor, true)
-				render.DrawLine(B, C, EdgeColor, true)
-				render.DrawLine(C, A, EdgeColor, true)
-			end
-		end
-	end
-
-	local ClipPlaneColor = Color(0, 200, 255, 60)
-
-	-- Draws each already-applied clip as a translucent quad on its plane
-	local function DrawClipPlanes(Entity)
-		local Clips = ImprovedClipping.GetClips(Entity)
-		if not Clips[1] then return end
-
-		local Radius = Entity:BoundingRadius()
-		local Size = Radius * 2
-
-		for _, Clip in ipairs(Clips) do
-			local LocalCenter = Clip.Normal * Clip.Distance
-			local Center = Entity:LocalToWorld(LocalCenter)
-			local Normal = -(Entity:LocalToWorld(LocalCenter + Clip.Normal) - Center):GetNormalized()
-
-			render.DrawQuadEasy(Center, Normal, Size, Size, ClipPlaneColor)
-		end
-	end
-
-	local OverlayMaterial = Material("models/debug/debugwhite")
-
-	-- Draws Target split by the plane at Distance along Normal: kept side red, cut side green
-	local function DrawPossibleClipPlane(Target, Normal, Distance, Offset)
-		local WasClippingEnabled = render.EnableClipping(true)
-		render.MaterialOverride(OverlayMaterial)
-
-		render.PushCustomClipPlane(Normal, Distance - Offset)
-		render.SetColorModulation(1, 0, 0)
-		Target:DrawModel()
-		render.PopCustomClipPlane()
-
-		render.PushCustomClipPlane(-Normal, -Distance + Offset)
-		render.SetColorModulation(0, 1, 0)
-		Target:DrawModel()
-		render.PopCustomClipPlane()
-
-		render.MaterialOverride(nil)
-		render.EnableClipping(WasClippingEnabled)
-	end
-
-	-- Hides the real entity while we draw its clipped preview in its place
-	local HiddenEntity
-
-	hook.Add("PostDrawTranslucentRenderables", "ImprovedClipping_Overlay", function(bDrawingDepth, bDrawingSkybox)
-		if bDrawingDepth or bDrawingSkybox then return end
-
-		local Player = LocalPlayer()
-		local Trace = Player:GetEyeTrace()
-		local Entity = GetClippingTarget(Player, Trace)
-
-		-- Draw the clip proxy if it exists, so existing clips show; else the model
-		local Proxy = IsValid(Entity) and ImprovedClipping.GetProxy(Entity)
-		local Target = IsValid(Proxy) and Proxy or Entity
-
-		if IsValid(HiddenEntity) and HiddenEntity ~= Target then
-			HiddenEntity:SetNoDraw(false)
-			HiddenEntity = nil
-		end
-
-		if not Entity then return end
-
-		local Shift = Player:KeyDown(IN_SPEED)
-
-		local Tool = Player:GetTool("improved_clipping")
-		local Normal = Tool and Tool.Normal
-		local Pos = Tool and Tool.Pos
-		if not Shift and (not Normal or not Pos) then return end
-
-		Target:SetNoDraw(true)
-		HiddenEntity = Target
-
-		-- Shift: show convexes and clip planes instead of the plane preview
-		if Shift then
-			DrawConvexes(Entity)
-			DrawClipPlanes(Entity)
-
-			return
-		end
-
-		local Invert = Player:KeyDown(IN_WALK) and -1 or 1
-		local Offset = Tool:GetClientNumber("offset") * Invert
-		local Distance = Normal:Dot(Pos) * Invert
-
-		DrawPossibleClipPlane(Target, Normal * Invert, Distance, Offset)
+		Tool.Normal, Tool.Pos = ReadPlane()
 	end)
 end
 
--- Runs in both realms so the pending clip plane is available immediately client-side for the preview.
+-- Singleplayer support
+if SERVER then util.AddNetworkString("improved_clipping_plane_sp") end
+
+-- True singleplayer never invokes the CLIENT tool hook, so the server pushes its plane over for the preview.
 function TOOL:LeftClick(Trace)
 	local Entity = GetClippingTarget(self:GetOwner(), Trace)
 	if not Entity then return false end
 
-	-- The server takes its plane off the net message instead of tracing for its own
-	if SERVER then return true end
-
 	-- Prediction runs this more than once per click, which would advance LastPlane each time
-	if not IsFirstTimePredicted() then return true end
+	if CLIENT and not IsFirstTimePredicted() then return true end
 
-	local op = self:GetOperation()
-	if op == 0 then
-		local Plane1 = { Origin = Trace.HitPos, Normal = Trace.HitNormal }
-		local Plane2 = self.LastPlane or Plane1
-		self.LastPlane = Plane1
+	local Normal, Pos = ComputeClipPlane(self, Trace)
+	if not Normal or not Pos then return true end
 
-		local LineNormal = Plane1.Normal:Cross(Plane2.Normal)
-		local LineLengthSqr = LineNormal:LengthSqr()
+	self.Normal = Normal
+	self.Pos = Pos
 
-		if LineLengthSqr > 1e-10 then -- Planes are not parallel
-			self.Normal = LineNormal:Cross(Plane1.Normal + Plane2.Normal):GetNormalized()
-			self.Pos = Plane1.Origin + LineNormal:Cross(Plane2.Normal) * Plane2.Normal:Dot(Plane2.Origin - Plane1.Origin) / LineLengthSqr
-		else
-			self.Normal = Trace.HitNormal
-			self.Pos = Trace.HitPos
-		end
-	elseif op == 1 then
-		self.Normal = Trace.HitNormal
-		self.Pos = Trace.HitPos
+	if SERVER and game.SinglePlayer() then
+		net.Start("improved_clipping_plane_sp")
+		WritePlane(Normal, Pos)
+		net.Send(self:GetOwner())
 	end
-
-	if not self.Normal or not self.Pos then return true end
-
-	net.Start("improved_clipping_plane")
-	net.WriteFloat(self.Normal.x)
-	net.WriteFloat(self.Normal.y)
-	net.WriteFloat(self.Normal.z)
-	net.WriteFloat(self.Pos.x)
-	net.WriteFloat(self.Pos.y)
-	net.WriteFloat(self.Pos.z)
-	net.SendToServer()
 
 	return true
 end
