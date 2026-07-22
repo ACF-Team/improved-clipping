@@ -135,16 +135,24 @@ if CLIENT then
 	end)
 end
 
--- Singleplayer support
 if SERVER then util.AddNetworkString("improved_clipping_plane_sp") end
 
--- True singleplayer never invokes the CLIENT tool hook, so the server pushes its plane over for the preview.
+net.Receive("improved_clipping_plane_sp", function()
+	local Tool = LocalPlayer():GetTool("improved_clipping")
+	if not Tool then return end
+
+	Tool.Normal, Tool.Pos = ReadPlane()
+end)
+
 function TOOL:LeftClick(Trace)
 	local Entity = GetClippingTarget(self:GetOwner(), Trace)
 	if not Entity then return false end
 
 	-- Prediction runs this more than once per click, which would advance LastPlane each time
 	if CLIENT and not IsFirstTimePredicted() then return true end
+
+	-- Server has nothing to compute here in multiplayer; it waits for the client's net message instead.
+	if SERVER and not game.SinglePlayer() then return true end
 
 	local Normal, Pos = ComputeClipPlane(self, Trace)
 	if not Normal or not Pos then return true end
@@ -156,6 +164,10 @@ function TOOL:LeftClick(Trace)
 		net.Start("improved_clipping_plane_sp")
 		WritePlane(Normal, Pos)
 		net.Send(self:GetOwner())
+	elseif CLIENT then
+		net.Start("improved_clipping_plane_sp")
+		WritePlane(Normal, Pos)
+		net.SendToServer()
 	end
 
 	return true
