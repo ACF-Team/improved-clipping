@@ -24,6 +24,7 @@ local ConVarDefaults = {
 for Name, Default in pairs(ConVarDefaults) do TOOL.ClientConVar[Name] = Default end
 
 AddCSLuaFile("modules/visualizations.lua")
+AddCSLuaFile("modules/profiler.lua")
 
 local function WritePlane(Normal, Pos)
 	net.WriteFloat(Normal.x)
@@ -92,6 +93,8 @@ if CLIENT then
 	language.Add("tool.improved_clipping.alt", "Hold Alt to invert the clipping plane (cut the other side)")
 	language.Add("tool.improved_clipping.shift", "Hold Shift to preview clipped physics convexes and existing clip planes")
 
+	local BuildPanel_Profiler = include("modules/profiler.lua")
+
 	function TOOL.BuildCPanel(Panel)
 		local KeepMass = Panel:CheckBox("Keep mass when physics clipping", "improved_clipping_keep_mass")
 		KeepMass:SetTooltip("Preserve the entity's original mass after its physics mesh is clipped")
@@ -118,6 +121,8 @@ if CLIENT then
 				RunConsoleCommand("improved_clipping_" .. Name, Default)
 			end
 		end
+
+		Panel:AddPanel(BuildPanel_Profiler())
 	end
 
 	include("modules/visualizations.lua")(GetClippingTarget)
