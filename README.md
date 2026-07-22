@@ -7,6 +7,7 @@ entity's place, rather than per-frame render clip planes.
 
 Additional support for special entities such as primitives.
 
+
 API:
 - `ImprovedClipping.ClipsLeft(Ent)` [sh]
     - Returns clips remaining, depending on realm called on.
