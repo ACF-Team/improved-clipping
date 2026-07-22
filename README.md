@@ -2,11 +2,32 @@
 
 Clipping tool with both visual and physical support.
 
-Visuals are baked clipped render meshes (with sealed cut faces) drawn in the
-entity's place, rather than per-frame render clip planes.
+Instead of applying render clipping planes for visuals, we modify the visual mesh of the entity.
 
-Additional support for special entities such as primitives.
+Additional support for special entities such as [primitives](https://steamcommunity.com/sharedfiles/filedetails/?id=2840295308) and [prop2mesh](https://steamcommunity.com/sharedfiles/filedetails/?id=2458909924) by delegating clips.
 
+Please submit issues and feedback on the [github](https://github.com/ACF-Team/improved-clipping)
+
+Inspired by prior clipping addons such as:
+- [Visual Clip Tool](https://steamcommunity.com/sharedfiles/filedetails/?id=238138995)
+- [Visual Clip Tool](https://steamcommunity.com/sharedfiles/filedetails/?id=106753151)
+- [Proper Clipping](https://steamcommunity.com/sharedfiles/filedetails/?id=2256491552)
+
+Server Convars:
+- `improved_clipping_max_clips`
+    - Max clips an entity can have. Default 8, Min 0, Max 8.
+
+Client Convars:
+- `improved_clipping_keep_mass`
+    - Keep mass when physics clipping. Default 1.
+- `improved_clipping_seal_holes`
+    - Seal holes cut by clipping (expensive). Default 0.
+- `improved_clipping_add_undo`
+    - Add clips to the undo list. Default 1.
+- `improved_clipping_mode`
+    - Tool mode (dual hitplane / single hitplane). Default 0.
+- `improved_clipping_offset`
+    - Plane offset applied when clipping. Default 0.
 
 API:
 - `ImprovedClipping.ClipsLeft(Ent)` [sh]
@@ -25,17 +46,13 @@ API:
 - `ImprovedClipping.Reset(Ent)` [sh]
     - Resets physics mesh and properties
 
-Special entities:
+Hooks/Attributes For Special entities:
 - `Ent.ImprovedClippingExternalMesh` [sh]
     - Set truthy on entities that own their own mesh, such as primitives. Clips are still
       stored, networked and duplicated, but the physics object and render proxy are left
       alone, and `SetClips` always succeeds since there is no rebuild to fail.
     - Entities that reinitialize their physics object on rebuild should set this, otherwise
       the rebuild wipes the clips.
-- `ImprovedClipping_ClipsChanged(Ent)` [hook, sh]
+- `ImprovedClipping_ClipsChanged(Ent)` [sh]
     - Fires whenever an entity's clips change. Rebuild the clipped mesh from here, reading
       the planes with `GetClips`.
-
-Inspired by prior clipping addons such as:
-- https://github.com/ndbeals/Clip_Tool
-- https://github.com/Sevii77/proper_clipping
