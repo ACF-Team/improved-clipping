@@ -1,7 +1,7 @@
 ImprovedClipping = ImprovedClipping or {}
 ImprovedClipping.ClippedEntities = ImprovedClipping.ClippedEntities or {}
 
-local MaxClips = CreateConVar("improved_clipping_max_clips", "8", bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED), "Max clips a entity can have", 0, 8)
+local MaxClips = CreateConVar("improved_clipping_max_clips", "8", bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED), "Max clips a entity can have", 0, 12)
 
 -- Clips are stored in entity-local space on Ent.ImprovedClipping:
 --   Clips = { { ID, Normal, Distance, KeepMass, Seal }, ... } -- geometry on the Normal side is kept
