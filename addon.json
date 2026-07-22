@@ -1,0 +1,17 @@
+{
+	"title"		:	"Improved Clipping",
+	"type"		:	"tool",
+	"tags"		:	[ "build", "fun" ],
+	"ignore"	:
+	[
+		"*.psd",
+		"*.vcproj",
+		"*.svn*",
+		"*.git*",
+		"*.txt",
+		"*.sw.vtx",
+		"improved-clipping.png",
+		"README.md",
+		"LICENSE"
+	]
+}
