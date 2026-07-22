@@ -60,6 +60,7 @@ return function(GetClippingTarget)
 			local Normal = -(Entity:LocalToWorld(LocalCenter + Clip.Normal) - Center):GetNormalized()
 
 			render.DrawQuadEasy(Center, Normal, Size, Size, ClipPlaneColor)
+			render.DrawQuadEasy(Center, -Normal, Size, Size, ClipPlaneColor)
 		end
 	end
 
@@ -114,6 +115,13 @@ return function(GetClippingTarget)
 
 		Target:SetNoDraw(true)
 		HiddenEntity = Target
+
+		local PhysObj = Entity:GetPhysicsObject()
+		if not IsValid(PhysObj) then return end
+
+		-- Doctors hate this hack...
+		PhysObj:SetPos(Entity:GetPos())
+		PhysObj:SetAngles(Entity:GetAngles())
 
 		-- Shift: show convexes and clip planes instead of the plane preview
 		if Shift then
