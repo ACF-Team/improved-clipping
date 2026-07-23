@@ -133,7 +133,6 @@ if SERVER then util.AddNetworkString("improved_clipping_plane_sp") end
 -- SV -> CL on single player and CL -> SV on multiplayer
 net.Receive("improved_clipping_plane_sp", function(_, Ply)
 	local Player = CLIENT and LocalPlayer() or Ply
-	print(Player)
 	local Tool = Player:GetTool("improved_clipping")
 	if not Tool then return end
 
@@ -189,6 +188,7 @@ function TOOL:RightClick(Trace)
 	local Seal = self:GetClientNumber("seal_holes", 0) ~= 0
 	local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { KeepMass }, { Seal })
 
+	-- Add this clip to the undo list if valid and the option is enabled.
 	if next(IDs) and self:GetClientNumber("add_undo", 1) ~= 0 then
 		undo.Create("Improved Clipping")
 		undo.AddFunction(function(_, UndoEntity, UndoIDs)

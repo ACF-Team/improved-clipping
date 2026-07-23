@@ -122,18 +122,15 @@ return function(GetClippingTarget)
 			PhysObj:SetAngles(Entity:GetAngles())
 		end
 
-		-- Shift: show convexes and clip planes instead of the plane preview
 		if Shift then
 			DrawConvexes(Entity)
 			DrawClipPlanes(Entity)
+		else
+			local Invert = Player:KeyDown(IN_WALK) and -1 or 1
+			local Offset = Tool:GetClientNumber("offset") * Invert
+			local Distance = Normal:Dot(Pos) * Invert
 
-			return
+			DrawPossibleClipPlane(Target, Normal * Invert, Distance, Offset)
 		end
-
-		local Invert = Player:KeyDown(IN_WALK) and -1 or 1
-		local Offset = Tool:GetClientNumber("offset") * Invert
-		local Distance = Normal:Dot(Pos) * Invert
-
-		DrawPossibleClipPlane(Target, Normal * Invert, Distance, Offset)
 	end)
 end
