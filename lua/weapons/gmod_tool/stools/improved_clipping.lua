@@ -126,27 +126,19 @@ if CLIENT then
 	end
 
 	include("modules/visualizations.lua")(GetClippingTarget)
-
-	net.Receive("improved_clipping_plane_sp", function()
-		local Tool = LocalPlayer():GetTool("improved_clipping")
-		if not Tool then return end
-
-		Tool.Normal, Tool.Pos = ReadPlane()
-	end)
 end
 
-if SERVER then
-	util.AddNetworkString("improved_clipping_plane_sp")
+if SERVER then util.AddNetworkString("improved_clipping_plane_sp") end
 
-	net.Receive("improved_clipping_plane_sp", function(_, Ply)
-		if not IsValid(Ply) then return end
+-- SV -> CL on single player and CL -> SV on multiplayer
+net.Receive("improved_clipping_plane_sp", function(_, Ply)
+	local Player = CLIENT and LocalPlayer() or Ply
+	print(Player)
+	local Tool = Player:GetTool("improved_clipping")
+	if not Tool then return end
 
-		local Tool = Ply:GetTool("improved_clipping")
-		if not Tool then return end
-
-		Tool.Normal, Tool.Pos = ReadPlane()
-	end)
-end
+	Tool.Normal, Tool.Pos = ReadPlane()
+end)
 
 function TOOL:LeftClick(Trace)
 	local Entity = GetClippingTarget(self:GetOwner(), Trace)

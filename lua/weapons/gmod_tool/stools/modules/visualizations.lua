@@ -117,11 +117,10 @@ return function(GetClippingTarget)
 		HiddenEntity = Target
 
 		local PhysObj = Entity:GetPhysicsObject()
-		if not IsValid(PhysObj) then return end
-
-		-- Doctors hate this hack...
-		PhysObj:SetPos(Entity:GetPos())
-		PhysObj:SetAngles(Entity:GetAngles())
+		if IsValid(PhysObj) then
+			PhysObj:SetPos(Entity:GetPos())
+			PhysObj:SetAngles(Entity:GetAngles())
+		end
 
 		-- Shift: show convexes and clip planes instead of the plane preview
 		if Shift then
