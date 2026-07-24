@@ -3,9 +3,13 @@ name: GLuaTest Runner
 on:
   workflow_dispatch:
   pull_request:
+    paths:
+    - 'lua/**'
   push:
     branches:
       - "master"
+    paths:
+    - 'lua/**'
 
 jobs:
   run-gluatest:
