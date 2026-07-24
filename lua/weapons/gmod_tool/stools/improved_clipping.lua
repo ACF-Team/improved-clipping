@@ -121,7 +121,30 @@ if CLIENT then
 		Panel:AddPanel(BuildPanel_Profiler())
 	end
 
-	include("modules/visualizations.lua")(GetClippingTarget)
+	local DrawOverlay = include("modules/visualizations.lua")()
+
+	hook.Add("PostDrawTranslucentRenderables", "ImprovedClipping_Overlay", function(bDrawingDepth, bDrawingSkybox)
+		if bDrawingDepth or bDrawingSkybox then return end
+
+		local Player = LocalPlayer()
+		local Trace = Player:GetEyeTrace()
+		local Entity = GetClippingTarget(Player, Trace)
+
+		-- Draw the clip proxy if it exists, so existing clips show; else the model
+		local Proxy = IsValid(Entity) and ImprovedClipping.GetProxy(Entity)
+		local Target = IsValid(Proxy) and Proxy or Entity
+
+		local Shift = Player:KeyDown(IN_SPEED)
+
+		local Tool = Player:GetTool("improved_clipping")
+		local Normal = Tool and Tool.Normal
+		local Pos = Tool and Tool.Pos
+
+		local Invert = Player:KeyDown(IN_WALK) and -1 or 1
+		local Offset = Tool and Tool:GetClientNumber("offset") * Invert or 0
+
+		DrawOverlay(Entity, Target, Shift, Normal and Normal * Invert, Pos, Offset)
+	end)
 end
 
 if SERVER then util.AddNetworkString("improved_clipping_plane_sp") end

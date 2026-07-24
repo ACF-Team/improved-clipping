@@ -1,7 +1,7 @@
 -- Draws the clipping tool's client-side overlays: physics convexes, existing clip planes, and the
--- pending plane preview. Takes GetClippingTarget as an explicit dependency since locals from the
--- main stool file (where the matching tool state lives) aren't visible across include() boundaries.
-return function(GetClippingTarget)
+-- pending plane preview. Returns the draw function; the caller resolves the clip target/tool state
+-- and is responsible for hooking it up.
+return function()
 	local EdgeColor = Color(255, 255, 255, 255)
 
 	local ConvexColors = {
@@ -88,29 +88,16 @@ return function(GetClippingTarget)
 	-- Hides the real entity while we draw its clipped preview in its place
 	local HiddenEntity
 
-	hook.Add("PostDrawTranslucentRenderables", "ImprovedClipping_Overlay", function(bDrawingDepth, bDrawingSkybox)
-		if bDrawingDepth or bDrawingSkybox then return end
-
-		local Player = LocalPlayer()
-		local Trace = Player:GetEyeTrace()
-		local Entity = GetClippingTarget(Player, Trace)
-
-		-- Draw the clip proxy if it exists, so existing clips show; else the model
-		local Proxy = IsValid(Entity) and ImprovedClipping.GetProxy(Entity)
-		local Target = IsValid(Proxy) and Proxy or Entity
-
+	-- Draws the clip proxy/model preview and hides the real entity behind it, if a valid target is aimed at.
+	-- Entity is the real clip target; Target is what to draw/hide in its place (Entity or its clip proxy).
+	-- Normal/Offset are expected already inverted for the player's alt-invert state.
+	local function DrawOverlay(Entity, Target, Shift, Normal, Pos, Offset)
 		if IsValid(HiddenEntity) and HiddenEntity ~= Target then
 			HiddenEntity:SetNoDraw(false)
 			HiddenEntity = nil
 		end
 
 		if not Entity then return end
-
-		local Shift = Player:KeyDown(IN_SPEED)
-
-		local Tool = Player:GetTool("improved_clipping")
-		local Normal = Tool and Tool.Normal
-		local Pos = Tool and Tool.Pos
 		if not Shift and (not Normal or not Pos) then return end
 
 		Target:SetNoDraw(true)
@@ -126,11 +113,11 @@ return function(GetClippingTarget)
 			DrawConvexes(Entity)
 			DrawClipPlanes(Entity)
 		else
-			local Invert = Player:KeyDown(IN_WALK) and -1 or 1
-			local Offset = Tool:GetClientNumber("offset") * Invert
-			local Distance = Normal:Dot(Pos) * Invert
+			local Distance = Normal:Dot(Pos)
 
-			DrawPossibleClipPlane(Target, Normal * Invert, Distance, Offset)
+			DrawPossibleClipPlane(Target, Normal, Distance, Offset)
 		end
-	end)
+	end
+
+	return DrawOverlay
 end
