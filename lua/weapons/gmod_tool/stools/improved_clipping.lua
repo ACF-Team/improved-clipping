@@ -14,7 +14,6 @@ TOOL.Information = {
 }
 
 local ConVarDefaults = {
-	["keep_mass"]         = "1",
 	["seal_holes"]        = "0",
 	["add_undo"]          = "1",
 	["mode"]              = "0",
@@ -96,9 +95,6 @@ if CLIENT then
 	local BuildPanel_Profiler = include("modules/profiler.lua")
 
 	function TOOL.BuildCPanel(Panel)
-		local KeepMass = Panel:CheckBox("Keep mass when physics clipping", "improved_clipping_keep_mass")
-		KeepMass:SetTooltip("Preserve the entity's original mass after its physics mesh is clipped")
-
 		local SealHoles = Panel:CheckBox("Seal holes (expensive?)", "improved_clipping_seal_holes")
 		SealHoles:SetTooltip("Cap the cut surface of new clips so the clipped entity doesn't appear hollow")
 		SealHoles:SetTextColor(Color(200, 0, 0))
@@ -184,9 +180,8 @@ function TOOL:RightClick(Trace)
 	local WorldPoint = self.Pos - self.Normal * self:GetClientNumber("offset")
 	local Normal, Distance = ImprovedClipping.WorldToLocalPlane(Entity, WorldNormal, WorldPoint)
 
-	local KeepMass = self:GetClientNumber("keep_mass", 1) ~= 0
 	local Seal = self:GetClientNumber("seal_holes", 0) ~= 0
-	local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { KeepMass }, { Seal })
+	local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { Seal })
 
 	-- Add this clip to the undo list if valid and the option is enabled.
 	if next(IDs) and self:GetClientNumber("add_undo", 1) ~= 0 then

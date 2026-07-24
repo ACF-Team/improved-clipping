@@ -259,7 +259,6 @@ net.Receive("improved_clipping", function()
 			Normal = Vector(net.ReadFloat(), net.ReadFloat(), net.ReadFloat()),
 			Distance = net.ReadFloat(),
 			Seal = net.ReadBool(),
-			KeepMass = true,
 		}
 	end
 

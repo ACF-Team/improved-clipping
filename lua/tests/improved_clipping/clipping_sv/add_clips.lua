@@ -164,22 +164,11 @@ return {
 		},
 
 		{
-			name = "Keeps the mass by default",
+			name = "Always preserves the mass",
 			func = function(State)
 				ImprovedClipping.AddClips(State.Cube, { Vector(1, 0, 0) }, { 0 })
 
 				expect(Near(State.Cube:GetPhysicsObject():GetMass(), State.Mass, 0.5)).to.beTrue()
-			end
-		},
-
-		{
-			name = "Scales the mass with the remaining volume when asked",
-			func = function(State)
-				ImprovedClipping.AddClips(State.Cube, { Vector(1, 0, 0) }, { 0 }, { false })
-
-				local Mass = State.Cube:GetPhysicsObject():GetMass()
-				expect(Mass < State.Mass).to.beTrue()
-				expect(Near(Mass, State.Mass * 0.5, State.Mass * 0.1)).to.beTrue()
 			end
 		},
 
@@ -189,7 +178,7 @@ return {
 				ImprovedClipping.AddClips(State.Cube, { Vector(1, 0, 0) }, { 0 })
 				expect(ImprovedClipping.GetClips(State.Cube)[1].Seal).to.beFalse()
 
-				ImprovedClipping.AddClips(State.Cube, { Vector(0, 1, 0) }, { 0 }, nil, { true })
+				ImprovedClipping.AddClips(State.Cube, { Vector(0, 1, 0) }, { 0 }, { true })
 				expect(ImprovedClipping.GetClips(State.Cube)[2].Seal).to.beTrue()
 			end
 		},

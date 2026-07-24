@@ -26,12 +26,11 @@ local function Near(Actual, Expected, Tolerance)
 	return math.abs(Actual - Expected) <= (Tolerance or 0.1)
 end
 
-local function Clip(ID, Normal, Distance, KeepMass, Seal)
+local function Clip(ID, Normal, Distance, Seal)
 	return {
 		ID = ID,
 		Normal = Normal,
 		Distance = Distance,
-		KeepMass = KeepMass ~= false,
 		Seal = Seal == true,
 	}
 end

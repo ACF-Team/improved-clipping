@@ -4,8 +4,8 @@ ImprovedClipping.ClippedEntities = ImprovedClipping.ClippedEntities or {}
 local MaxClips = CreateConVar("improved_clipping_max_clips", "8", bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED), "Max clips a entity can have", 0, 12)
 
 -- Clips are stored in entity-local space on Ent.ImprovedClipping:
---   Clips = { { ID, Normal, Distance, KeepMass, Seal }, ... } -- geometry on the Normal side is kept
---   OriginalConvexes, Mass, Volume                      -- captured before the first clip
+--   Clips = { { ID, Normal, Distance, Seal }, ... } -- geometry on the Normal side is kept
+--   OriginalConvexes                                -- captured before the first clip
 
 ----------------------------------------
 -- Plane clipping math
@@ -339,11 +339,9 @@ local function RebuildPhysics(Ent)
 
 	local State = Ent.ImprovedClipping
 	local Convexes = State.OriginalConvexes
-	local KeepMass = true
+	local PreviousMass = SERVER and PhysObj:GetMass() or nil
 
 	for _, Clip in ipairs(State.Clips) do
-		if not Clip.KeepMass then KeepMass = false end
-
 		local Clipped = {}
 		for _, Vertices in ipairs(Convexes) do
 			local Result = ClipTriangles(Vertices, Clip.Normal, Clip.Distance)
@@ -387,12 +385,7 @@ local function RebuildPhysics(Ent)
 	ApplyPhysData(PhysObj, Data)
 
 	if SERVER then
-		local Mass = State.Mass
-		if not KeepMass and State.Volume > 0 then
-			Mass = math.max(1, Mass * (PhysObj:GetVolume() or State.Volume) / State.Volume)
-		end
-
-		PhysObj:SetMass(Mass)
+		PhysObj:SetMass(PreviousMass)
 	end
 
 	if IsValid(Parent) then Ent:SetParent(Parent) end
@@ -420,7 +413,7 @@ function ImprovedClipping.ClipsLeft(Ent)
 	return math.max(0, MaxClips:GetInt() - (State and #State.Clips or 0))
 end
 
--- Returns a copy of the entity's clips: { { ID, Normal, Distance, KeepMass, Seal }, ... }
+-- Returns a copy of the entity's clips: { { ID, Normal, Distance, Seal }, ... }
 function ImprovedClipping.GetClips(Ent)
 	local Clips = {}
 	local State = IsValid(Ent) and Ent.ImprovedClipping
@@ -431,7 +424,6 @@ function ImprovedClipping.GetClips(Ent)
 			ID = Clip.ID,
 			Normal = Vector(Clip.Normal),
 			Distance = Clip.Distance,
-			KeepMass = Clip.KeepMass,
 			Seal = Clip.Seal,
 		}
 	end
@@ -472,8 +464,6 @@ function ImprovedClipping.SetClips(Ent, Clips)
 				Clips = {},
 				NextID = 1,
 				OriginalConvexes = {},
-				Mass = 0,
-				Volume = 0,
 			}
 		else
 			local PhysObj = Ent:GetPhysicsObject()
@@ -489,8 +479,6 @@ function ImprovedClipping.SetClips(Ent, Clips)
 				Clips = {},
 				NextID = 1,
 				OriginalConvexes = GetConvexes(PhysObj),
-				Mass = PhysObj:GetMass(),
-				Volume = PhysObj:GetVolume() or 0,
 			}
 		end
 
@@ -524,7 +512,7 @@ function ImprovedClipping.SetClips(Ent, Clips)
 end
 
 -- Adds clips (entity-local planes), rebuilding the physics object once. Returns the added IDs.
-function ImprovedClipping.AddClips(Ent, Normals, Distances, KeepMasses, Seals)
+function ImprovedClipping.AddClips(Ent, Normals, Distances, Seals)
 	local IDs = {}
 	if not IsValid(Ent) then return IDs end
 
@@ -546,7 +534,6 @@ function ImprovedClipping.AddClips(Ent, Normals, Distances, KeepMasses, Seals)
 			ID = NextID,
 			Normal = Normals[i],
 			Distance = Distances[i],
-			KeepMass = not KeepMasses or KeepMasses[i] ~= false,
 			Seal = Seals ~= nil and Seals[i] == true,
 		}
 

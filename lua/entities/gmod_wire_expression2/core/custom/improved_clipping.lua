@@ -14,26 +14,22 @@ end
 ----------------------------------------
 -- Adding
 
-local function addclip(self, ent, origin, normal, keepmass, seal)
+local function addclip(self, ent, origin, normal, seal)
 	if not checktool(ent, self) then return 0 end
 
 	local LocalNormal, Distance = ImprovedClipping.WorldToLocalPlane(ent, vec(normal), vec(origin))
-	local IDs = ImprovedClipping.AddClips(ent, { LocalNormal }, { Distance }, { keepmass }, { seal })
+	local IDs = ImprovedClipping.AddClips(ent, { LocalNormal }, { Distance }, { seal })
 
 	return IDs[1] or 0
 end
 
 __e2setcost(500)
-e2function number entity:addClip(vector origin, vector normal, number keepMass, number seal)
-	return addclip(self, this, origin, normal, keepMass ~= 0, seal ~= 0)
-end
-
-e2function number entity:addClip(vector origin, vector normal, number keepMass)
-	return addclip(self, this, origin, normal, keepMass ~= 0, true)
+e2function number entity:addClip(vector origin, vector normal, number seal)
+	return addclip(self, this, origin, normal, seal ~= 0)
 end
 
 e2function number entity:addClip(vector origin, vector normal)
-	return addclip(self, this, origin, normal, true, true)
+	return addclip(self, this, origin, normal, true)
 end
 
 ----------------------------------------
@@ -96,17 +92,15 @@ e2function table entity:getClips()
 				id = Clip.ID,
 				normal = Clip.Normal,
 				distance = Clip.Distance,
-				keepMass = Clip.KeepMass and 1 or 0,
 				seal = Clip.Seal and 1 or 0,
 			},
 			stypes = {
 				id = "n",
 				normal = "v",
 				distance = "n",
-				keepMass = "n",
 				seal = "n",
 			},
-			size = 5,
+			size = 4,
 			n = {},
 			ntypes = {},
 		}

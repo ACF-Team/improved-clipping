@@ -18,8 +18,6 @@ Server Convars:
     - Max clips an entity can have. Default 8, Min 0, Max 8.
 
 Client Convars:
-- `improved_clipping_keep_mass`
-    - Keep mass when physics clipping. Default 1.
 - `improved_clipping_seal_holes`
     - Seal holes cut by clipping (expensive). Default 0.
 - `improved_clipping_add_undo`
@@ -32,14 +30,14 @@ Client Convars:
 API:
 - `ImprovedClipping.ClipsLeft(Ent)` [sh]
     - Returns clips remaining, depending on realm called on.
-- `ImprovedClipping.AddClips(Ent, Normals, Distances, KeepMasses, Seals)` [sh]
+- `ImprovedClipping.AddClips(Ent, Normals, Distances, Seals)` [sh]
     - Adds clips, modifies mesh and batch updates physics object once. Returns IDs.
     - Normals/Distances are entity-local planes; geometry on the normal's side is kept.
-    - KeepMasses/Seals are optional and default true; Seal caps the cut face.
+    - Seals is optional and defaults true; Seal caps the cut face. The entity's mass is always preserved.
 - `ImprovedClipping.RemoveClips(Ent, IDs)` [sh]
     - Removes clips, modifies mesh and batch updates physics object once
 - `ImprovedClipping.GetClips(Ent)` [sh]
-    - Returns a copy of the entity's clips: `{ { ID, Normal, Distance, KeepMass, Seal }, ... }`
+    - Returns a copy of the entity's clips: `{ { ID, Normal, Distance, Seal }, ... }`
 - `ImprovedClipping.SetClips(Ent, Clips)` [sh]
     - Replaces the entire clip list and rebuilds physics once. Empty list fully resets.
     - Returns false and reverts if the rebuild fails.

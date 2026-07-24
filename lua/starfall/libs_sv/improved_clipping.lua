@@ -32,21 +32,20 @@ end
 -- --------------------------------------
 -- Methods
 
---- Adds a physical clip to the entity, cutting away everything on the far side of the plane
+--- Adds a physical clip to the entity, cutting away everything on the far side of the plane.
+-- The entity's mass is always preserved.
 -- @param origin A point on the clipping plane, in world space
 -- @param normal The plane's normal, in world space; geometry on this side is kept
--- @param keepMass Optional bool (default true), whether to preserve the entity's original mass
 -- @param seal Optional bool (default true), whether to cap the cut surface
 -- @return The new clip's ID, or 0 if it failed
-function ents_methods:addClip(origin, normal, keepMass, seal)
+function ents_methods:addClip(origin, normal, seal)
 	local ent = getent(self)
 	checkclip(ent)
 
-	if keepMass == nil then keepMass = true else checkluatype(keepMass, TYPE_BOOL) end
 	if seal == nil then seal = true else checkluatype(seal, TYPE_BOOL) end
 
 	local LocalNormal, Distance = ImprovedClipping.WorldToLocalPlane(ent, vunwrap(normal), vunwrap(origin))
-	local IDs = ImprovedClipping.AddClips(ent, { LocalNormal }, { Distance }, { keepMass }, { seal })
+	local IDs = ImprovedClipping.AddClips(ent, { LocalNormal }, { Distance }, { seal })
 
 	return IDs[1] or 0
 end
@@ -87,7 +86,7 @@ function ents_methods:isClipped()
 end
 
 --- Returns the entity's clips
--- @return Table array of clip data (id, normal, distance, keepMass, seal)
+-- @return Table array of clip data (id, normal, distance, seal)
 function ents_methods:getClips()
 	local ent = getent(self)
 	if not IsValid(ent) then SF.Throw("Entity is not valid.", 2) end
@@ -98,7 +97,6 @@ function ents_methods:getClips()
 			id = clip.ID,
 			normal = vwrap(clip.Normal),
 			distance = clip.Distance,
-			keepMass = clip.KeepMass,
 			seal = clip.Seal,
 		}
 	end

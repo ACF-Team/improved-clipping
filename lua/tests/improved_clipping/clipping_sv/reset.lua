@@ -110,9 +110,9 @@ return {
 			name = "Reset restores the original mesh and mass",
 			func = function(State)
 				local Cube = State.Cube
-				ImprovedClipping.AddClips(Cube, { Vector(1, 0, 0), Vector(0, 1, 0) }, { 0, 0 }, { false, false })
+				ImprovedClipping.AddClips(Cube, { Vector(1, 0, 0), Vector(0, 1, 0) }, { 0, 0 })
 
-				expect(Cube:GetPhysicsObject():GetMass() < State.Mass).to.beTrue()
+				expect(Near(Cube:GetPhysicsObject():GetMass(), State.Mass, 0.5)).to.beTrue()
 				expect(ImprovedClipping.Reset(Cube)).to.beTrue()
 
 				expect(IsFullCube(Cube)).to.beTrue()

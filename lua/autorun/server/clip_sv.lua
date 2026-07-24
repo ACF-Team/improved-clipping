@@ -39,11 +39,10 @@ function ImprovedClipping.Sync(Ent)
 		local State = Ent.ImprovedClipping
 
 		if State then
-			local Normals, Distances, KeepMasses, Seals = {}, {}, {}, {}
+			local Normals, Distances, Seals = {}, {}, {}
 			for i, Clip in ipairs(State.Clips) do
 				Normals[i] = Clip.Normal
 				Distances[i] = Clip.Distance
-				KeepMasses[i] = Clip.KeepMass
 				Seals[i] = Clip.Seal
 			end
 
@@ -52,9 +51,7 @@ function ImprovedClipping.Sync(Ent)
 			duplicator.StoreEntityModifier(Ent, "improved_clipping", {
 				Normals = Normals,
 				Distances = Distances,
-				KeepMasses = KeepMasses,
 				Seals = Seals,
-				OriginalMass = State.Mass,
 				Mass = IsValid(PhysObj) and PhysObj:GetMass() or nil,
 			})
 		end
@@ -75,12 +72,7 @@ duplicator.RegisterEntityModifier("improved_clipping", function(Player, Ent, Dat
 
 	if not IsValid(Ent) then return end
 
-	ImprovedClipping.AddClips(Ent, Data.Normals, Data.Distances, Data.KeepMasses, Data.Seals)
-
-	local State = Ent.ImprovedClipping
-	if State and Data.OriginalMass then
-		State.Mass = Data.OriginalMass
-	end
+	ImprovedClipping.AddClips(Ent, Data.Normals, Data.Distances, Data.Seals)
 
 	local PhysObj = Ent:GetPhysicsObject()
 	if IsValid(PhysObj) and Data.Mass then

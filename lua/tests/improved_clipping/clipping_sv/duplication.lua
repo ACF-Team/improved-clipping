@@ -83,7 +83,7 @@ return {
 			timeout = 5,
 			func = function(State)
 				local Cube = State.Cube
-				ImprovedClipping.AddClips(Cube, { Vector(1, 0, 0), Vector(0, 1, 0) }, { 0, 10 }, { true, false }, { false, true })
+				ImprovedClipping.AddClips(Cube, { Vector(1, 0, 0), Vector(0, 1, 0) }, { 0, 10 }, { false, true })
 
 				timer.Simple(SyncDelay, function()
 					local Data = Cube.EntityMods and Cube.EntityMods.improved_clipping
@@ -92,10 +92,7 @@ return {
 					expect(#Data.Normals).to.equal(2)
 					expect(Data.Normals[1]).to.equal(Vector(1, 0, 0))
 					expect(Data.Distances[2]).to.equal(10)
-					expect(Data.KeepMasses[1]).to.beTrue()
-					expect(Data.KeepMasses[2]).to.beFalse()
 					expect(Data.Seals[2]).to.beTrue()
-					expect(Data.OriginalMass).to.equal(State.Mass)
 					expect(Data.Mass).to.equal(Cube:GetPhysicsObject():GetMass())
 
 					done()
@@ -147,12 +144,12 @@ return {
 		},
 
 		{
-			name = "A pasted copy keeps the clipped mass and can be reset to the original",
+			name = "A pasted copy keeps the preserved mass and can be reset to the original",
 			async = true,
 			timeout = 5,
 			func = function(State)
 				local Cube = State.Cube
-				ImprovedClipping.AddClips(Cube, { Vector(1, 0, 0) }, { 0 }, { false })
+				ImprovedClipping.AddClips(Cube, { Vector(1, 0, 0) }, { 0 })
 
 				local Clipped = Cube:GetPhysicsObject():GetMass()
 
