@@ -46,13 +46,10 @@ function ImprovedClipping.Sync(Ent)
 				Seals[i] = Clip.Seal
 			end
 
-			local PhysObj = Ent:GetPhysicsObject()
-
 			duplicator.StoreEntityModifier(Ent, "improved_clipping", {
 				Normals = Normals,
 				Distances = Distances,
 				Seals = Seals,
-				Mass = IsValid(PhysObj) and PhysObj:GetMass() or nil,
 			})
 		end
 
@@ -73,11 +70,6 @@ duplicator.RegisterEntityModifier("improved_clipping", function(Player, Ent, Dat
 	if not IsValid(Ent) then return end
 
 	ImprovedClipping.AddClips(Ent, Data.Normals, Data.Distances, Data.Seals)
-
-	local PhysObj = Ent:GetPhysicsObject()
-	if IsValid(PhysObj) and Data.Mass then
-		PhysObj:SetMass(Data.Mass)
-	end
 end)
 
 -- After pasting, AdvDupe2 replaces the physics of parented, unconstrained entities

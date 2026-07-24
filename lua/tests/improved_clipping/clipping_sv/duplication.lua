@@ -93,7 +93,6 @@ return {
 					expect(Data.Normals[1]).to.equal(Vector(1, 0, 0))
 					expect(Data.Distances[2]).to.equal(10)
 					expect(Data.Seals[2]).to.beTrue()
-					expect(Data.Mass).to.equal(Cube:GetPhysicsObject():GetMass())
 
 					done()
 				end)
@@ -144,20 +143,21 @@ return {
 		},
 
 		{
-			name = "A pasted copy keeps the preserved mass and can be reset to the original",
+			name = "A pasted copy spawns with its own mass, not the source's, and can still be reset",
 			async = true,
 			timeout = 5,
 			func = function(State)
 				local Cube = State.Cube
 				ImprovedClipping.AddClips(Cube, { Vector(1, 0, 0) }, { 0 })
-
-				local Clipped = Cube:GetPhysicsObject():GetMass()
+				Cube:GetPhysicsObject():SetMass(State.Mass * 4) -- Simulates another addon changing the mass afterward
 
 				timer.Simple(SyncDelay, function()
 					local Copy = Paste(Cube, State)
-					expect(Near(Copy:GetPhysicsObject():GetMass(), Clipped, 0.5)).to.beTrue()
 
-					-- Reset has to give back the mass the cube had before it was ever clipped
+					-- The duplicator modifier doesn't carry a mass; the pasted copy just gets
+					-- whatever its own fresh physics object spawns with
+					expect(Near(Copy:GetPhysicsObject():GetMass(), State.Mass, 0.5)).to.beTrue()
+
 					expect(ImprovedClipping.Reset(Copy)).to.beTrue()
 					expect(Near(Copy:GetPhysicsObject():GetMass(), State.Mass, 0.5)).to.beTrue()
 
