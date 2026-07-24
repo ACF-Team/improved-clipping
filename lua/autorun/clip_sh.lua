@@ -491,6 +491,12 @@ function ImprovedClipping.SetClips(Ent, Clips)
 		end)
 	end
 
+	-- Clipping a multi convex will always result in a concave hole in the physics mesh.
+	-- We shouldn't introduce a visual filling where there is a physical hole.
+	if #State.OriginalConvexes > 1 then
+		for _, Clip in ipairs(Clips) do Clip.Seal = false end
+	end
+
 	local Old = State.Clips
 	State.Clips = Clips
 

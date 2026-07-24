@@ -96,7 +96,7 @@ if CLIENT then
 
 	function TOOL.BuildCPanel(Panel)
 		local SealHoles = Panel:CheckBox("Seal holes (expensive?)", "improved_clipping_seal_holes")
-		SealHoles:SetTooltip("Cap the cut surface of new clips so the clipped entity doesn't appear hollow")
+		SealHoles:SetTooltip("Cap surface after clip. Does not work on multiconvex (hollow) entities")
 		SealHoles:SetTextColor(Color(200, 0, 0))
 
 		local AddUndo = Panel:CheckBox("Add clips to undo list", "improved_clipping_add_undo")
