@@ -73,20 +73,46 @@ duplicator.RegisterEntityModifier("improved_clipping", function(Player, Ent, Dat
 		return
 	end
 
-	-- Wait a tick so the entity's physics object is fully set up before clipping
+	if not IsValid(Ent) then return end
+
+	ImprovedClipping.AddClips(Ent, Data.Normals, Data.Distances, Data.KeepMasses, Data.Seals)
+
+	local State = Ent.ImprovedClipping
+	if State and Data.OriginalMass then
+		State.Mass = Data.OriginalMass
+	end
+
+	local PhysObj = Ent:GetPhysicsObject()
+	if IsValid(PhysObj) and Data.Mass then
+		PhysObj:SetMass(Data.Mass)
+	end
+end)
+
+-- After pasting, AdvDupe2 replaces the physics of parented, unconstrained entities
+-- with a shadow of the original model (PhysicsInitShadow in sv_clipboard.lua), wiping
+-- the clipped vcollide the modifier above built. Once the paste is done, rebuild those
+-- entities so the clipped physics takes over from the shadow.
+hook.Add("AdvDupe_FinishPasting", "improved_clipping", function(Data)
+	if not istable(Data) or not istable(Data[1]) or not istable(Data[1].CreatedEntities) then return end
+
+	local Ents = {}
+	for _, Ent in pairs(Data[1].CreatedEntities) do
+		Ents[#Ents + 1] = Ent
+	end
+
 	timer.Simple(0, function()
-		if not IsValid(Ent) then return end
+		for _, Ent in ipairs(Ents) do
+			if IsValid(Ent) and Ent.ImprovedClipping and not Ent.ImprovedClippingExternalMesh and IsValid(Ent:GetParent()) then
+				local PhysObj = Ent:GetPhysicsObject()
+				local Mass = IsValid(PhysObj) and PhysObj:GetMass() or nil
 
-		ImprovedClipping.AddClips(Ent, Data.Normals, Data.Distances, Data.KeepMasses, Data.Seals)
+				ImprovedClipping.RebuildPhysics(Ent)
 
-		local State = Ent.ImprovedClipping
-		if State and Data.OriginalMass then
-			State.Mass = Data.OriginalMass
-		end
-
-		local PhysObj = Ent:GetPhysicsObject()
-		if IsValid(PhysObj) and Data.Mass then
-			PhysObj:SetMass(Data.Mass)
+				PhysObj = Ent:GetPhysicsObject()
+				if IsValid(PhysObj) and Mass then
+					PhysObj:SetMass(Mass)
+				end
+			end
 		end
 	end)
 end)

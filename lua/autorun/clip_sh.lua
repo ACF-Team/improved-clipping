@@ -360,11 +360,16 @@ local function RebuildPhysics(Ent)
 
 	local Data = CapturePhysData(Ent, PhysObj)
 
+	-- Unparent for the rebuild and reparent after (adapted from empirical primitive fix)
+	local Parent = SERVER and Ent:GetParent() or nil
+	if IsValid(Parent) then Ent:SetParent(nil) end
+
 	-- Can crash without this
 	-- https://github.com/Facepunch/garrysmod/blob/master/garrysmod/lua/entities/sent_ball.lua#L75
 	Ent.ConstraintSystem = nil
 
 	if not Ent:PhysicsInitMultiConvex(Convexes) then
+		if IsValid(Parent) then Ent:SetParent(Parent) end
 		if SERVER then QueueConstraints(Data.Constraints) end
 		return false
 	end
@@ -374,7 +379,10 @@ local function RebuildPhysics(Ent)
 	Ent:EnableCustomCollisions(true)
 
 	PhysObj = Ent:GetPhysicsObject()
-	if not IsValid(PhysObj) then return false end
+	if not IsValid(PhysObj) then
+		if IsValid(Parent) then Ent:SetParent(Parent) end
+		return false
+	end
 
 	ApplyPhysData(PhysObj, Data)
 
@@ -387,8 +395,12 @@ local function RebuildPhysics(Ent)
 		PhysObj:SetMass(Mass)
 	end
 
+	if IsValid(Parent) then Ent:SetParent(Parent) end
+
 	return true
 end
+
+ImprovedClipping.RebuildPhysics = RebuildPhysics
 
 -- Converts a world-space plane (a direction and a point on the plane) into the
 -- entity-local Normal/Distance pair Clips are stored as
