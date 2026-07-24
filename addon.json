@@ -11,6 +11,8 @@
 		"*.git*",
 		"*.txt",
 		"*.sw.vtx",
+		".glualint.json",
+		".github/*",
 		"improved-clipping.jpg",
 		"README.md",
 		"LICENSE"
