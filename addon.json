@@ -4,6 +4,7 @@
 	"tags"		:	[ "build", "fun" ],
 	"ignore"	:
 	[
+		"lua/tests/*",
 		"*.psd",
 		"*.vcproj",
 		"*.svn*",
