@@ -130,9 +130,7 @@ if CLIENT then
 		local Trace = Player:GetEyeTrace()
 		local Entity = GetClippingTarget(Player, Trace)
 
-		-- Draw the clip proxy if it exists, so existing clips show; else the model
-		local Proxy = IsValid(Entity) and ImprovedClipping.GetProxy(Entity)
-		local Target = IsValid(Proxy) and Proxy or Entity
+		local Target = Entity
 
 		local Shift = Player:KeyDown(IN_SPEED)
 
