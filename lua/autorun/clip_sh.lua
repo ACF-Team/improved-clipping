@@ -1,7 +1,12 @@
 ImprovedClipping = ImprovedClipping or {}
 ImprovedClipping.ClippedEntities = ImprovedClipping.ClippedEntities or {}
 
-local MaxClips = CreateConVar("improved_clipping_max_clips", "8", bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED), "Max clips a entity can have", 0, 12)
+-- Props render through the GPU clip-plane pipeline, so their cap is bounded by what that
+-- pipeline can draw. Deferred entities (primitives and other external-mesh addons) rebuild
+-- their own mesh instead, so they can afford more clips. Both caps are enforced when clips
+-- are added, never at render time, so what gets clipped and what gets drawn always agree.
+local MaxClips = CreateConVar("improved_clipping_max_clips", "8", bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED), "Max clips a prop can have", 0, 12)
+local MaxClipsDeferred = CreateConVar("improved_clipping_max_clips_deferred", "8", bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED), "Max clips a deferred (external-mesh) entity can have", 0, 12)
 
 -- Clips are stored in entity-local space on Ent.ImprovedClipping:
 --   Clips = { { ID, Normal, Distance, Seal }, ... } -- geometry on the Normal side is kept
@@ -386,6 +391,8 @@ local function RebuildPhysics(Ent)
 
 	if SERVER then
 		PhysObj:SetMass(PreviousMass)
+	else
+		Ent.ImprovedClippingClientPhys = true
 	end
 
 	if IsValid(Parent) then Ent:SetParent(Parent) end
@@ -409,8 +416,12 @@ end
 
 -- Returns how many more clips the entity can have in the current realm
 function ImprovedClipping.ClipsLeft(Ent)
-	local State = IsValid(Ent) and Ent.ImprovedClipping
-	return math.max(0, MaxClips:GetInt() - (State and #State.Clips or 0))
+	if not IsValid(Ent) then return 0 end
+
+	local Max = (Ent.ImprovedClippingExternalMesh and MaxClipsDeferred or MaxClips):GetInt()
+	local State = Ent.ImprovedClipping
+
+	return math.max(0, Max - (State and #State.Clips or 0))
 end
 
 -- Returns a copy of the entity's clips: { { ID, Normal, Distance, Seal }, ... }
