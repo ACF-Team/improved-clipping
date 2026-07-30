@@ -448,6 +448,8 @@ end
 function ImprovedClipping.SetClips(Ent, Clips)
 	if not IsValid(Ent) then return false end
 
+	if hook.Run("ImprovedClipping_CanClip", Ent, Clips) == false then return false end
+
 	local State = Ent.ImprovedClipping
 	local External = Ent.ImprovedClippingExternalMesh
 
