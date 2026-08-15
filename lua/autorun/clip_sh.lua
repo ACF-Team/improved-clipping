@@ -63,125 +63,14 @@ local function PushTriangle(Result, A, B, C)
 	Result[i + 2] = C
 end
 
--- Orthonormal basis of the plane, Right x Up == Normal
-local function PlaneBasis(Normal)
-	local Right = (math.abs(Normal.z) < 0.9 and Vector(0, 0, 1) or Vector(1, 0, 0)):Cross(Normal)
-	Right:Normalize()
-
-	return Right, Normal:Cross(Right)
-end
-
--- Texels per unit of the source mesh, so cap geometry matches the skin's texture scale
-local function TexelDensity(Vertices)
-	local UVArea, WorldArea = 0, 0
-
-	for i = 1, #Vertices - 2, 3 do
-		local V1, V2, V3 = Vertices[i], Vertices[i + 1], Vertices[i + 2]
-
-		WorldArea = WorldArea + (V2.pos - V1.pos):Cross(V3.pos - V1.pos):Length()
-		UVArea = UVArea + math.abs((V2.u - V1.u) * (V3.v - V1.v) - (V2.v - V1.v) * (V3.u - V1.u))
-	end
-
-	if WorldArea < 1e-6 or UVArea < 1e-6 then return 1 / 64 end
-
-	return math.sqrt(UVArea / WorldArea)
-end
-
--- Convex hull of 2D points ({ X, Y, Pos }), counter-clockwise. Andrew's monotone
--- chain, O(n log n): https://en.wikipedia.org/wiki/Convex_hull_algorithms
--- Pseudocode: https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain
---
--- Returns the hull table and its length. The table keeps stale entries past that
--- length, so read the count and never #Hull.
-local function ConvexHull(Points)
-	table.sort(Points, function(A, B)
-		if A.X ~= B.X then return A.X < B.X end
-		return A.Y < B.Y
-	end)
-
-	local function Cross(O, A, B)
-		return (A.X - O.X) * (B.Y - O.Y) - (A.Y - O.Y) * (B.X - O.X)
-	end
-
-	local Hull, N = {}, 0
-
-	-- Appends a point, first dropping any tail that makes a non-left turn. Floor keeps
-	-- the upper hull from eating the lower one.
-	local function Append(P, Floor)
-		while N > Floor and Cross(Hull[N - 1], Hull[N], P) <= 0 do
-			N = N - 1
-		end
-
-		N = N + 1
-		Hull[N] = P
-	end
-
-	-- Lower hull, left to right
-	for i = 1, #Points do
-		Append(Points[i], 1)
-	end
-
-	-- Upper hull, right to left. The rightmost point already sits at the end of the
-	-- lower hull, so start one short of it and keep it as the new floor.
-	local Floor = N
-	for i = #Points - 1, 1, -1 do
-		Append(Points[i], Floor)
-	end
-
-	return Hull, N - 1 -- The leftmost point closes the loop and repeats Hull[1]
-end
-
--- Caps the hole the clip opened up by fanning the cut points' convex hull
-local function CapHole(Result, Cut, Normal, Source, Density)
-	if #Cut < 3 then return end
-
-	local CapNormal = -Normal
-	-- Reversed, because Source winds front faces clockwise about the normal and the
-	-- hull comes back counter-clockwise in this basis
-	local Up, Right = PlaneBasis(CapNormal)
-
-	local Projected = {}
-	for i, Pos in ipairs(Cut) do
-		Projected[i] = { X = Right:Dot(Pos), Y = Up:Dot(Pos), Pos = Pos }
-	end
-
-	local Points, Count = ConvexHull(Projected)
-	if Count < 3 then return end
-
-	Density = Density or TexelDensity(Source)
-	local Tangent = { Right.x, Right.y, Right.z, 1 }
-
-	local function CapVertex(Pos)
-		return {
-			pos = Pos,
-			normal = CapNormal,
-			u = Right:Dot(Pos) * Density,
-			v = Up:Dot(Pos) * Density,
-			userdata = Tangent,
-		}
-	end
-
-	-- A convex polygon fans from any of its own vertices
-	local Hub = CapVertex(Points[1].Pos)
-
-	for i = 2, Count - 1 do
-		PushTriangle(Result, Hub, CapVertex(Points[i].Pos), CapVertex(Points[i + 1].Pos))
-	end
-end
-
 -- Clips a triangle soup (flat vertex array, 3 per triangle) against a plane,
 -- keeping the geometry on the side the normal points toward.
 --
 -- Textured means the vertices are util.GetModelMeshes structs ({ pos, normal, u, v,
 -- userdata }) instead of bare Vectors, and cut vertices interpolate those attributes.
--- Cap then seals the hole along the plane. Physics passes neither.
---
--- Density is the cap's texel density. Pass the source model's, measured once and cached;
--- otherwise it's measured from Vertices, which for the second clip onward is already
--- clipped geometry.
-local function ClipTriangles(Vertices, Normal, Distance, Textured, Cap, Density)
+-- Physics passes neither. Leaves the cut open; capping has moved elsewhere.
+local function ClipTriangles(Vertices, Normal, Distance, Textured)
 	local Result = {}
-	local Cut = (Textured and Cap) and {} or nil
 
 	for i = 1, #Vertices - 2, 3 do
 		local V1, V2, V3 = Vertices[i], Vertices[i + 1], Vertices[i + 2]
@@ -215,11 +104,6 @@ local function ClipTriangles(Vertices, Normal, Distance, Textured, Cap, Density)
 
 				PushTriangle(Result, VA, VB, PCB)
 				PushTriangle(Result, VA, PCB, PCA)
-
-				if Cut then
-					Cut[#Cut + 1] = PosCA
-					Cut[#Cut + 1] = PosCB
-				end
 			end
 		elseif AboveCount == 1 then
 			-- Clips to a smaller triangle. VA is the vertex above the plane.
@@ -236,24 +120,14 @@ local function ClipTriangles(Vertices, Normal, Distance, Textured, Cap, Density)
 				local PAC = Textured and LerpVertex(VA, VC, PosAC, FracAC) or PosAC
 
 				PushTriangle(Result, VA, PAB, PAC)
-
-				if Cut then
-					Cut[#Cut + 1] = PosAC
-					Cut[#Cut + 1] = PosAB
-				end
 			end
 		end
-	end
-
-	if Cut then
-		CapHole(Result, Cut, Normal, Vertices, Density)
 	end
 
 	return Result
 end
 
 ImprovedClipping.ClipTriangles = ClipTriangles
-ImprovedClipping.TexelDensity = TexelDensity
 
 ----------------------------------------
 -- Physics rebuilding

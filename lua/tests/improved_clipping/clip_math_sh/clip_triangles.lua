@@ -170,53 +170,10 @@ return {
 		},
 
 		{
-			name = "Caps the hole with triangles lying on the plane",
-			func = function()
-				local Meshes = util.GetModelMeshes("models/hunter/blocks/cube1x1x1.mdl")
-				expect(Meshes).to.exist()
-
-				local Vertices = Meshes[1].triangles
-				local Result = ImprovedClipping.ClipTriangles(Vertices, Vector(1, 0, 0), 0, true, true)
-
-				expect(#Result > 0).to.beTrue()
-				expect(#Result % 3).to.equal(0)
-
-				local Cap = 0
-				for i = 1, #Result - 2, 3 do
-					local OnPlane = 0
-					for j = i, i + 2 do
-						if math.abs(Result[j].pos.x) < 0.01 then OnPlane = OnPlane + 1 end
-					end
-
-					if OnPlane == 3 then Cap = Cap + 1 end
-				end
-
-				-- The square hole fans into two triangles
-				expect(Cap).to.equal(2)
-			end
-		},
-
-		{
-			name = "Cap vertices face away from the clip normal and carry a tangent",
-			func = function()
-				local Vertices = util.GetModelMeshes("models/hunter/blocks/cube1x1x1.mdl")[1].triangles
-				local Result = ImprovedClipping.ClipTriangles(Vertices, Vector(1, 0, 0), 0, true, true)
-
-				for _, Vertex in ipairs(Result) do
-					if math.abs(Vertex.pos.x) < 0.01 and math.abs(Vertex.normal.x) > 0.5 then
-						expect(Near(Vertex.normal.x, -1)).to.beTrue()
-						expect(Vertex.userdata).to.exist()
-						expect(#Vertex.userdata).to.equal(4)
-					end
-				end
-			end
-		},
-
-		{
 			name = "Interpolates texture coordinates across the cut",
 			func = function()
 				local Vertices = util.GetModelMeshes("models/hunter/blocks/cube1x1x1.mdl")[1].triangles
-				local Result = ImprovedClipping.ClipTriangles(Vertices, Vector(1, 0, 0), 0, true, false)
+				local Result = ImprovedClipping.ClipTriangles(Vertices, Vector(1, 0, 0), 0, true)
 
 				for _, Vertex in ipairs(Result) do
 					expect(Vertex.u).to.beA("number")
@@ -224,16 +181,6 @@ return {
 					expect(Vertex.u == Vertex.u).to.beTrue() -- Not NaN
 					expect(Vertex.v == Vertex.v).to.beTrue()
 				end
-			end
-		},
-
-		{
-			name = "Measures the texel density of the source mesh",
-			func = function()
-				local Vertices = util.GetModelMeshes("models/hunter/blocks/cube1x1x1.mdl")[1].triangles
-				local Density = ImprovedClipping.TexelDensity(Vertices)
-
-				expect(Density > 0).to.beTrue()
 			end
 		},
 	}
