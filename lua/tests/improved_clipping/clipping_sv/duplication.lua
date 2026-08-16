@@ -35,6 +35,7 @@ local function SpawnCube(Pos)
 	Cube:SetModel("models/hunter/blocks/cube1x1x1.mdl")
 	Cube:SetPos(Pos or Vector(0, 0, 0))
 	Cube:Spawn()
+	Cube.ImprovedClippingAllowSeal = true
 
 	return Cube
 end

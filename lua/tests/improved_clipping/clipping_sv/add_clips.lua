@@ -36,6 +36,7 @@ return {
 		Cube:SetModel("models/hunter/blocks/cube1x1x1.mdl")
 		Cube:SetPos(Vector(0, 0, 0))
 		Cube:Spawn()
+		Cube.ImprovedClippingAllowSeal = true
 
 		State.Mass = Cube:GetPhysicsObject():GetMass()
 	end,
