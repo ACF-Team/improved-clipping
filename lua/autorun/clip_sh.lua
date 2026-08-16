@@ -31,31 +31,6 @@ local function IntersectLinePlane(A, B, Normal, Distance)
 	return A + Direction * Fraction, Fraction
 end
 
--- Builds the vertex sitting Fraction of the way from V1 to V2, interpolating render attributes
-local function LerpVertex(V1, V2, Pos, Fraction)
-	local Normal = LerpVector(Fraction, V1.normal, V2.normal)
-	Normal:Normalize()
-
-	local Vertex = {
-		pos = Pos,
-		normal = Normal,
-		u = Lerp(Fraction, V1.u, V2.u),
-		v = Lerp(Fraction, V1.v, V2.v),
-	}
-
-	local UD1, UD2 = V1.userdata, V2.userdata
-	if UD1 and UD2 then
-		Vertex.userdata = {
-			Lerp(Fraction, UD1[1], UD2[1]),
-			Lerp(Fraction, UD1[2], UD2[2]),
-			Lerp(Fraction, UD1[3], UD2[3]),
-			UD1[4],
-		}
-	end
-
-	return Vertex
-end
-
 local function PushTriangle(Result, A, B, C)
 	local i = #Result + 1
 	Result[i] = A
@@ -63,23 +38,15 @@ local function PushTriangle(Result, A, B, C)
 	Result[i + 2] = C
 end
 
--- Clips a triangle soup (flat vertex array, 3 per triangle) against a plane,
+-- Clips a triangle soup (flat vertex array of Vectors, 3 per triangle) against a plane,
 -- keeping the geometry on the side the normal points toward.
 --
--- Textured means the vertices are util.GetModelMeshes structs ({ pos, normal, u, v,
--- userdata }) instead of bare Vectors, and cut vertices interpolate those attributes.
--- Physics passes neither. Leaves the cut open; capping has moved elsewhere.
-local function ClipTriangles(Vertices, Normal, Distance, Textured)
+-- Leaves the cut open; capping has moved elsewhere.
+local function ClipTriangles(Vertices, Normal, Distance)
 	local Result = {}
 
 	for i = 1, #Vertices - 2, 3 do
-		local V1, V2, V3 = Vertices[i], Vertices[i + 1], Vertices[i + 2]
-		local P1, P2, P3
-		if Textured then
-			P1, P2, P3 = V1.pos, V2.pos, V3.pos
-		else
-			P1, P2, P3 = V1, V2, V3
-		end
+		local P1, P2, P3 = Vertices[i], Vertices[i + 1], Vertices[i + 2]
 
 		local A1 = IsAbovePlane(P1, Normal, Distance)
 		local A2 = IsAbovePlane(P2, Normal, Distance)
@@ -87,39 +54,33 @@ local function ClipTriangles(Vertices, Normal, Distance, Textured)
 		local AboveCount = (A1 and 1 or 0) + (A2 and 1 or 0) + (A3 and 1 or 0)
 
 		if AboveCount == 3 then
-			PushTriangle(Result, V1, V2, V3)
+			PushTriangle(Result, P1, P2, P3)
 		elseif AboveCount == 2 then
-			-- Clips to a quad, split into two triangles. VC is the vertex below the plane.
-			local VA, VB, VC, PA, PB, PC
-			if not A1 then VA, VB, VC, PA, PB, PC = V2, V3, V1, P2, P3, P1
-			elseif not A2 then VA, VB, VC, PA, PB, PC = V3, V1, V2, P3, P1, P2
-			else VA, VB, VC, PA, PB, PC = V1, V2, V3, P1, P2, P3 end
+			-- Clips to a quad, split into two triangles. PC is the vertex below the plane.
+			local PA, PB, PC
+			if not A1 then PA, PB, PC = P2, P3, P1
+			elseif not A2 then PA, PB, PC = P3, P1, P2
+			else PA, PB, PC = P1, P2, P3 end
 
-			local PosCA, FracCA = IntersectLinePlane(PC, PA, Normal, Distance)
-			local PosCB, FracCB = IntersectLinePlane(PC, PB, Normal, Distance)
+			local PosCA = IntersectLinePlane(PC, PA, Normal, Distance)
+			local PosCB = IntersectLinePlane(PC, PB, Normal, Distance)
 
 			if PosCA and PosCB then
-				local PCA = Textured and LerpVertex(VC, VA, PosCA, FracCA) or PosCA
-				local PCB = Textured and LerpVertex(VC, VB, PosCB, FracCB) or PosCB
-
-				PushTriangle(Result, VA, VB, PCB)
-				PushTriangle(Result, VA, PCB, PCA)
+				PushTriangle(Result, PA, PB, PosCB)
+				PushTriangle(Result, PA, PosCB, PosCA)
 			end
 		elseif AboveCount == 1 then
-			-- Clips to a smaller triangle. VA is the vertex above the plane.
-			local VA, VB, VC, PA, PB, PC
-			if A1 then VA, VB, VC, PA, PB, PC = V1, V2, V3, P1, P2, P3
-			elseif A2 then VA, VB, VC, PA, PB, PC = V2, V3, V1, P2, P3, P1
-			else VA, VB, VC, PA, PB, PC = V3, V1, V2, P3, P1, P2 end
+			-- Clips to a smaller triangle. PA is the vertex above the plane.
+			local PA, PB, PC
+			if A1 then PA, PB, PC = P1, P2, P3
+			elseif A2 then PA, PB, PC = P2, P3, P1
+			else PA, PB, PC = P3, P1, P2 end
 
-			local PosAB, FracAB = IntersectLinePlane(PA, PB, Normal, Distance)
-			local PosAC, FracAC = IntersectLinePlane(PA, PC, Normal, Distance)
+			local PosAB = IntersectLinePlane(PA, PB, Normal, Distance)
+			local PosAC = IntersectLinePlane(PA, PC, Normal, Distance)
 
 			if PosAB and PosAC then
-				local PAB = Textured and LerpVertex(VA, VB, PosAB, FracAB) or PosAB
-				local PAC = Textured and LerpVertex(VA, VC, PosAC, FracAC) or PosAC
-
-				PushTriangle(Result, VA, PAB, PAC)
+				PushTriangle(Result, PA, PosAB, PosAC)
 			end
 		end
 	end

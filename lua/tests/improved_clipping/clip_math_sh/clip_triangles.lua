@@ -168,20 +168,5 @@ return {
 				expect(OnPlane > 0).to.beTrue()
 			end
 		},
-
-		{
-			name = "Interpolates texture coordinates across the cut",
-			func = function()
-				local Vertices = util.GetModelMeshes("models/hunter/blocks/cube1x1x1.mdl")[1].triangles
-				local Result = ImprovedClipping.ClipTriangles(Vertices, Vector(1, 0, 0), 0, true)
-
-				for _, Vertex in ipairs(Result) do
-					expect(Vertex.u).to.beA("number")
-					expect(Vertex.v).to.beA("number")
-					expect(Vertex.u == Vertex.u).to.beTrue() -- Not NaN
-					expect(Vertex.v == Vertex.v).to.beTrue()
-				end
-			end
-		},
 	}
 }
