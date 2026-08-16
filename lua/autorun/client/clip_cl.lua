@@ -126,6 +126,13 @@ net.Receive("improved_clipping", function()
 	Pending[Index] = 1
 end)
 
+net.Receive("improved_clipping_notify", function()
+	local NotifyType = net.ReadUInt(3)
+	local Text = net.ReadString()
+
+	notification.AddLegacy("Impr. Clip: " .. Text, NotifyType, 3)
+end)
+
 hook.Add("NetworkEntityCreated", "improved_clipping", function(Ent)
 	local Index = Ent:EntIndex()
 	if Cache[Index] then

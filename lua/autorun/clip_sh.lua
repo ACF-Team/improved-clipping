@@ -166,8 +166,9 @@ local function ApplyPhysData(PhysObj, Data)
 	end
 end
 
--- Rebuilds the physics object once from the original mesh with every stored clip applied
-local function RebuildPhysics(Ent)
+-- Rebuilds the physics object once from the original mesh with every stored clip applied.
+-- Player, if given, is warned when the rebuild is refused.
+local function RebuildPhysics(Ent, Player)
 	local PhysObj = Ent:GetPhysicsObject()
 
 	if CLIENT and not IsValid(PhysObj) then
@@ -194,7 +195,10 @@ local function RebuildPhysics(Ent)
 	end
 
 	-- Refuse to clip the entire mesh away
-	if not Convexes[1] then return false end
+	if not Convexes[1] then
+		if SERVER then ImprovedClipping.Warn(Player, "that clip would remove the entire entity, couldn't add clip.") end
+		return false
+	end
 
 	local Data = CapturePhysData(Ent, PhysObj)
 
@@ -280,13 +284,25 @@ end
 -- Replaces the entity's entire clip list, rebuilding the physics object once. An empty list
 -- fully resets the entity. Entities owning their own mesh skip the rebuild, so nothing can fail
 -- for them and this always succeeds; for everyone else a failed rebuild reverts and returns false.
-function ImprovedClipping.SetClips(Ent, Clips)
+-- Player, if given, is warned/notified as problems come up.
+function ImprovedClipping.SetClips(Ent, Clips, Player)
 	if not IsValid(Ent) then return false end
 
 	if hook.Run("ImprovedClipping_CanClip", Ent, Clips) == false then return false end
 
 	local State = Ent.ImprovedClipping
 	local External = Ent.ImprovedClippingExternalMesh
+
+	-- Sealing is removed from non deferred/external mesh entities.
+	if not External then
+		for _, Clip in ipairs(Clips) do
+			if Clip.Seal and SERVER then
+				ImprovedClipping.Notify(Player, "sealing only works on deferred (external-mesh) entities, clip added unsealed.")
+			end
+
+			Clip.Seal = false
+		end
+	end
 
 	if not Clips[1] then
 		if not State then return true end
@@ -339,16 +355,10 @@ function ImprovedClipping.SetClips(Ent, Clips)
 		end)
 	end
 
-	-- Clipping a multi convex will always result in a concave hole in the physics mesh.
-	-- We shouldn't introduce a visual filling where there is a physical hole.
-	if #State.OriginalConvexes > 1 then
-		for _, Clip in ipairs(Clips) do Clip.Seal = false end
-	end
-
 	local Old = State.Clips
 	State.Clips = Clips
 
-	if not External and not RebuildPhysics(Ent) then
+	if not External and not RebuildPhysics(Ent, Player) then
 		State.Clips = Old
 		return false
 	end
@@ -366,12 +376,16 @@ function ImprovedClipping.SetClips(Ent, Clips)
 end
 
 -- Adds clips (entity-local planes), rebuilding the physics object once. Returns the added IDs.
-function ImprovedClipping.AddClips(Ent, Normals, Distances, Seals)
+-- Player, if given, is warned/notified as problems come up.
+function ImprovedClipping.AddClips(Ent, Normals, Distances, Seals, Player)
 	local IDs = {}
 	if not IsValid(Ent) then return IDs end
 
 	local Count = math.min(#Normals, ImprovedClipping.ClipsLeft(Ent))
-	if Count < 1 then return IDs end
+	if Count < 1 then
+		if SERVER then ImprovedClipping.Warn(Player, "clip limit reached, couldn't add clip.") end
+		return IDs
+	end
 
 	local State = Ent.ImprovedClipping
 	local NextID = State and State.NextID or 1
@@ -396,7 +410,7 @@ function ImprovedClipping.AddClips(Ent, Normals, Distances, Seals)
 		IDs[#IDs + 1] = Clip.ID
 	end
 
-	if not ImprovedClipping.SetClips(Ent, Clips) then return {} end
+	if not ImprovedClipping.SetClips(Ent, Clips, Player) then return {} end
 
 	return IDs
 end

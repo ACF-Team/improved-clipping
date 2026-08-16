@@ -1,6 +1,21 @@
 ImprovedClipping = ImprovedClipping or {}
 
 util.AddNetworkString("improved_clipping")
+util.AddNetworkString("improved_clipping_notify")
+
+-- Shows a notification.AddLegacy popup on the given player's client
+local function SendNotify(Player, Text, NotifyType)
+	if not IsValid(Player) then return end
+
+	net.Start("improved_clipping_notify")
+	net.WriteUInt(NotifyType, 3)
+	net.WriteString(Text)
+	net.Send(Player)
+end
+
+-- NOTIFY_GENERIC/NOTIFY_ERROR are client-only globals; this runs serverside, so use their values directly
+function ImprovedClipping.Notify(Player, Text) SendNotify(Player, Text, 0) end
+function ImprovedClipping.Warn(Player, Text) SendNotify(Player, Text, 1) end
 
 -- Sends the entity's full clip list; a count of 0 tells the client to reset
 local function SendClips(Ent, Target)

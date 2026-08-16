@@ -96,7 +96,7 @@ if CLIENT then
 
 	function TOOL.BuildCPanel(Panel)
 		local SealHoles = Panel:CheckBox("Seal holes (expensive?)", "improved_clipping_seal_holes")
-		SealHoles:SetTooltip("Cap surface after clip. Does not work on multiconvex (hollow) entities")
+		SealHoles:SetTooltip("Cap surface after clip. Only works on deferred (external-mesh) entities, e.g. primitives")
 		SealHoles:SetTextColor(Color(200, 0, 0))
 
 		local AddUndo = Panel:CheckBox("Add clips to undo list", "improved_clipping_add_undo")
@@ -202,7 +202,7 @@ function TOOL:RightClick(Trace)
 	local Normal, Distance = ImprovedClipping.WorldToLocalPlane(Entity, WorldNormal, WorldPoint)
 
 	local Seal = self:GetClientNumber("seal_holes", 0) ~= 0
-	local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { Seal })
+	local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { Seal }, Owner)
 
 	-- Add this clip to the undo list if valid and the option is enabled.
 	if next(IDs) and self:GetClientNumber("add_undo", 1) ~= 0 then
