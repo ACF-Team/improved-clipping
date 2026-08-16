@@ -11,6 +11,11 @@ local MaxClipsDeferred = CreateConVar("improved_clipping_max_clips_deferred", "8
 -- Clips are stored in entity-local space on Ent.ImprovedClipping:
 --   Clips = { { ID, Normal, Distance, Seal }, ... } -- geometry on the Normal side is kept
 --   OriginalConvexes                                -- captured before the first clip
+--
+-- Ent.ImprovedClippingAllowSeal: must be set to exactly true for SetClips/AddClips to honor a
+-- clip's Seal flag at all; anything else (including unset) forces Seal = false. Deferred
+-- (external-mesh) entities like primitives opt in case by case, e.g. a primitive sets this
+-- false while its current shape is multi-convex and can't cap a concave cross-section.
 
 ----------------------------------------
 -- Plane clipping math
@@ -293,11 +298,15 @@ function ImprovedClipping.SetClips(Ent, Clips, Player)
 	local State = Ent.ImprovedClipping
 	local External = Ent.ImprovedClippingExternalMesh
 
-	-- Sealing is removed from non deferred/external mesh entities.
-	if not External then
+	-- Sealing must be explicitly opted into via ImprovedClippingAllowSeal, e.g. by a deferred
+	-- (external-mesh) entity like a primitive, on a case by case basis (it may not currently
+	-- support capping, such as while multi-convex). Unset for normal entities, so they never seal.
+	local AllowSeal = Ent.ImprovedClippingAllowSeal == true
+
+	if not AllowSeal then
 		for _, Clip in ipairs(Clips) do
 			if Clip.Seal and SERVER then
-				ImprovedClipping.Notify(Player, "sealing only works on deferred (external-mesh) entities, clip added unsealed.")
+				ImprovedClipping.Notify(Player, "this entity doesn't currently support sealing, clip added unsealed.")
 			end
 
 			Clip.Seal = false
