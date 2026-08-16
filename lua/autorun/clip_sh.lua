@@ -9,8 +9,11 @@ local MaxClips = CreateConVar("improved_clipping_max_clips", "8", bit.bor(FCVAR_
 local MaxClipsDeferred = CreateConVar("improved_clipping_max_clips_deferred", "8", bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED), "Max clips a deferred (external-mesh) entity can have", 0, 12)
 
 -- Clips are stored in entity-local space on Ent.ImprovedClipping:
---   Clips = { { ID, Normal, Distance, Seal }, ... } -- geometry on the Normal side is kept
+--   Clips = { { ID, Normal, Distance, Seal, Inside }, ... } -- geometry on the Normal side is kept
 --   OriginalConvexes                                -- captured before the first clip
+--
+-- Inside is purely a rendering hint (see clip_cl.lua RenderOverride): unlike Seal it never
+-- touches physics or requires ImprovedClippingAllowSeal, so any entity can use it.
 --
 -- Ent.ImprovedClippingAllowSeal: must be set to exactly true for SetClips/AddClips to honor a
 -- clip's Seal flag at all; anything else (including unset) forces Seal = false. Deferred
@@ -268,7 +271,7 @@ function ImprovedClipping.ClipsLeft(Ent)
 	return math.max(0, Max - (State and #State.Clips or 0))
 end
 
--- Returns a copy of the entity's clips: { { ID, Normal, Distance, Seal }, ... }
+-- Returns a copy of the entity's clips: { { ID, Normal, Distance, Seal, Inside }, ... }
 function ImprovedClipping.GetClips(Ent)
 	local Clips = {}
 	local State = IsValid(Ent) and Ent.ImprovedClipping
@@ -280,6 +283,7 @@ function ImprovedClipping.GetClips(Ent)
 			Normal = Vector(Clip.Normal),
 			Distance = Clip.Distance,
 			Seal = Clip.Seal,
+			Inside = Clip.Inside,
 		}
 	end
 
@@ -386,7 +390,7 @@ end
 
 -- Adds clips (entity-local planes), rebuilding the physics object once. Returns the added IDs.
 -- Player, if given, is warned/notified as problems come up.
-function ImprovedClipping.AddClips(Ent, Normals, Distances, Seals, Player)
+function ImprovedClipping.AddClips(Ent, Normals, Distances, Seals, Insides, Player)
 	local IDs = {}
 	if not IsValid(Ent) then return IDs end
 
@@ -412,6 +416,7 @@ function ImprovedClipping.AddClips(Ent, Normals, Distances, Seals, Player)
 			Normal = Normals[i],
 			Distance = Distances[i],
 			Seal = Seals ~= nil and Seals[i] == true,
+			Inside = Insides ~= nil and Insides[i] == true,
 		}
 
 		NextID = NextID + 1

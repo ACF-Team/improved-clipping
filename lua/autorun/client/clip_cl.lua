@@ -5,17 +5,12 @@ ImprovedClipping = ImprovedClipping or {}
 --
 -- The model is drawn whole, but hardware clip planes cut it on the GPU: every stored clip
 -- is pushed as a render clip plane before the model draws, so the geometry on each plane's
--- far side is discarded by the rasterizer. No mesh is baked and nothing is stored per frame.
-
--- Draws the entity with each clip applied as a hardware clip plane. Clips are stored in
--- entity-local space, so their normals rotate with the entity and their plane points map
--- through LocalToWorld before being handed to the rasterizer.
+-- far side is discarded by the rasterizer. 
 --
--- Every stored clip is drawn; the clip count is already capped where clips are added
--- (improved_clipping_max_clips), so there is no separate visual limit to disagree with it.
+-- Clips with sealing are not natively handled by Improved Clipping. It's up to the entity to handle that.
 --
--- A sealed clip has no cap to fill the hole GPU clipping leaves, so the model is drawn a
--- second time with reversed culling to paint its interior back faces and read as solid.
+-- If any clip has Inside = true, the model is drawn a second time with backface culling reversed,
+-- so the interior of the cut is drawn into the hole. This is purely visual and doesn't affect physics.
 local function RenderOverride(self)
 	local State = self.ImprovedClipping
 	if not State then return end
@@ -23,6 +18,7 @@ local function RenderOverride(self)
 	local Was = render.EnableClipping(true)
 	local Angles = self:GetAngles()
 	local Planes = 0
+	local Inside = false
 
 	for i, Clip in ipairs(State.Clips) do
 		local Normal = Vector(Clip.Normal)
@@ -32,9 +28,16 @@ local function RenderOverride(self)
 		render.PushCustomClipPlane(Normal, Normal:Dot(Point))
 
 		Planes = i
+		if Clip.Inside then Inside = true end
 	end
 
 	self:DrawModel()
+
+	if Inside then
+		render.CullMode(MATERIAL_CULLMODE_CW)
+		self:DrawModel()
+		render.CullMode(MATERIAL_CULLMODE_CCW)
+	end
 
 	for _ = 1, Planes do
 		render.PopCustomClipPlane()
@@ -119,6 +122,7 @@ net.Receive("improved_clipping", function()
 			Normal = Vector(net.ReadFloat(), net.ReadFloat(), net.ReadFloat()),
 			Distance = net.ReadFloat(),
 			Seal = net.ReadBool(),
+			Inside = net.ReadBool(),
 		}
 	end
 

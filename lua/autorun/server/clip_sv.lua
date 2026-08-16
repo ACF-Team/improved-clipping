@@ -33,6 +33,7 @@ local function SendClips(Ent, Target)
 		net.WriteFloat(Clip.Normal.z)
 		net.WriteFloat(Clip.Distance)
 		net.WriteBool(Clip.Seal)
+		net.WriteBool(Clip.Inside)
 	end
 
 	net.Send(Target or player.GetHumans())
@@ -54,17 +55,19 @@ function ImprovedClipping.Sync(Ent)
 		local State = Ent.ImprovedClipping
 
 		if State then
-			local Normals, Distances, Seals = {}, {}, {}
+			local Normals, Distances, Seals, Insides = {}, {}, {}, {}
 			for i, Clip in ipairs(State.Clips) do
 				Normals[i] = Clip.Normal
 				Distances[i] = Clip.Distance
 				Seals[i] = Clip.Seal
+				Insides[i] = Clip.Inside
 			end
 
 			duplicator.StoreEntityModifier(Ent, "improved_clipping", {
 				Normals = Normals,
 				Distances = Distances,
 				Seals = Seals,
+				Insides = Insides,
 			})
 		end
 
@@ -84,7 +87,7 @@ duplicator.RegisterEntityModifier("improved_clipping", function(Player, Ent, Dat
 
 	if not IsValid(Ent) then return end
 
-	ImprovedClipping.AddClips(Ent, Data.Normals, Data.Distances, Data.Seals)
+	ImprovedClipping.AddClips(Ent, Data.Normals, Data.Distances, Data.Seals, Data.Insides)
 end)
 
 -- After pasting, AdvDupe2 replaces the physics of parented, unconstrained entities

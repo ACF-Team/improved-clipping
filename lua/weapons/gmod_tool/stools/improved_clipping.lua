@@ -15,6 +15,7 @@ TOOL.Information = {
 
 local ConVarDefaults = {
 	["seal_holes"]        = "0",
+	["show_inside"]       = "0",
 	["add_undo"]          = "1",
 	["mode"]              = "0",
 	["offset"]            = "0",
@@ -96,8 +97,11 @@ if CLIENT then
 
 	function TOOL.BuildCPanel(Panel)
 		local SealHoles = Panel:CheckBox("Seal holes (expensive?)", "improved_clipping_seal_holes")
-		SealHoles:SetTooltip("Cap surface after clip. Only works on deferred (external-mesh) entities, e.g. primitives")
+		SealHoles:SetTooltip("Cap surface after clip. Only works with deferred entities like primitives. Purely visual, doesn't affect physics.")
 		SealHoles:SetTextColor(Color(200, 0, 0))
+
+		local ShowInside = Panel:CheckBox("Show inside", "improved_clipping_show_inside")
+		ShowInside:SetTooltip("Draws the model's interior within a clip. Purely visual, doesn't affect physics.")
 
 		local AddUndo = Panel:CheckBox("Add clips to undo list", "improved_clipping_add_undo")
 		AddUndo:SetTooltip("Allow clips made with this tool to be reverted with the undo command (Z)")
@@ -202,7 +206,8 @@ function TOOL:RightClick(Trace)
 	local Normal, Distance = ImprovedClipping.WorldToLocalPlane(Entity, WorldNormal, WorldPoint)
 
 	local Seal = self:GetClientNumber("seal_holes", 0) ~= 0
-	local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { Seal }, Owner)
+	local Inside = self:GetClientNumber("show_inside", 0) ~= 0
+	local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { Seal }, { Inside }, Owner)
 
 	-- Add this clip to the undo list if valid and the option is enabled.
 	if next(IDs) and self:GetClientNumber("add_undo", 1) ~= 0 then
