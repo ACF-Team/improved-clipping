@@ -302,21 +302,6 @@ function ImprovedClipping.SetClips(Ent, Clips, Player)
 	local State = Ent.ImprovedClipping
 	local External = Ent.ImprovedClippingExternalMesh
 
-	-- Sealing must be explicitly opted into via ImprovedClippingAllowSeal, e.g. by a deferred
-	-- (external-mesh) entity like a primitive, on a case by case basis (it may not currently
-	-- support capping, such as while multi-convex). Unset for normal entities, so they never seal.
-	local AllowSeal = Ent.ImprovedClippingAllowSeal == true
-
-	if not AllowSeal then
-		for _, Clip in ipairs(Clips) do
-			if Clip.Seal and SERVER then
-				ImprovedClipping.Notify(Player, "this entity doesn't currently support sealing, clip added unsealed.")
-			end
-
-			Clip.Seal = false
-		end
-	end
-
 	if not Clips[1] then
 		if not State then return true end
 

@@ -205,7 +205,15 @@ function TOOL:RightClick(Trace)
 	local WorldPoint = self.Pos - self.Normal * self:GetClientNumber("offset")
 	local Normal, Distance = ImprovedClipping.WorldToLocalPlane(Entity, WorldNormal, WorldPoint)
 
-	local Seal = self:GetClientNumber("seal_holes", 0) ~= 0
+	-- Sealing must be explicitly opted into via ImprovedClippingAllowSeal, e.g. by a deferred
+	-- (external-mesh) entity like a primitive, on a case by case basis (it may not currently
+	-- support capping, such as while multi-convex). Unset for normal entities, so they never seal.
+	local Seal = self:GetClientNumber("seal_holes", 0) ~= 0 and Entity.ImprovedClippingAllowSeal == true
+
+	if SERVER and self:GetClientNumber("seal_holes", 0) ~= 0 and not Seal then
+		ImprovedClipping.Notify(Owner, "this entity doesn't currently support sealing, clip added unsealed.")
+	end
+
 	local Inside = self:GetClientNumber("show_inside", 0) ~= 0
 	local IDs = ImprovedClipping.AddClips(Entity, { Normal }, { Distance }, { Seal }, { Inside }, Owner)
 
