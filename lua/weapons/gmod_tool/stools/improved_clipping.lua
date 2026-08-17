@@ -101,7 +101,7 @@ if CLIENT then
 		SealHoles:SetTextColor(Color(200, 0, 0))
 
 		local ShowInside = Panel:CheckBox("Show inside", "improved_clipping_show_inside")
-		ShowInside:SetTooltip("Draws the model's interior within a clip. Purely visual, doesn't affect physics.")
+		ShowInside:SetTooltip("Draws the model's interior within a clip. Does not work with deferred entities. Purely visual, doesn't affect physics.")
 
 		local AddUndo = Panel:CheckBox("Add clips to undo list", "improved_clipping_add_undo")
 		AddUndo:SetTooltip("Allow clips made with this tool to be reverted with the undo command (Z)")
@@ -123,6 +123,17 @@ if CLIENT then
 		end
 
 		Panel:AddPanel(BuildPanel_Profiler())
+
+		local QuickstartLabel = vgui.Create("DLabel", Panel)
+		QuickstartLabel:SetWrap(true)
+		QuickstartLabel:SetAutoStretchVertical(true)
+		QuickstartLabel:SetDark(true)
+		QuickstartLabel:SetText(
+			"Quick Start Instructions\n\n" ..
+			"1. Left click twice on a prop to define a clipping plane (two hits set the plane; hold Shift to preview it).\n\n" ..
+			"2. Right click the prop to apply the clip."
+		)
+		Panel:AddItem(QuickstartLabel)
 	end
 
 	local DrawOverlay = include("modules/visualizations.lua")()
