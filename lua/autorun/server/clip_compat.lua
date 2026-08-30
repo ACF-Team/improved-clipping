@@ -42,6 +42,9 @@ local function Register(Name, Convert)
 	duplicator.RegisterEntityModifier(Name, function(Player, Ent, Data)
 		if not IsValid(Ent) then return end
 
+		-- A dupe we saved, carrying the same clips in our own format, which has already applied them
+		if Ent.EntityMods and Ent.EntityMods.improved_clipping then return end
+
 		timer.Simple(0, function()
 			if not IsValid(Ent) then return end
 

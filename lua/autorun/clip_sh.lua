@@ -11,6 +11,7 @@ local MaxClipsDeferred = CreateConVar("improved_clipping_max_clips_deferred", "8
 -- Clips are stored in entity-local space on Ent.ImprovedClipping:
 --   Clips = { { ID, Normal, Distance, Seal, Inside }, ... } -- geometry on the Normal side is kept
 --   OriginalConvexes                                -- captured before the first clip
+--   OriginalOBBCenter                               -- ditto, since rebuilding physics moves OBBCenter
 --
 -- Inside is purely a rendering hint (see clip_cl.lua RenderOverride): unlike Seal it never
 -- touches physics or requires ImprovedClippingAllowSeal, so any entity can use it.
@@ -312,7 +313,13 @@ function ImprovedClipping.SetClips(Ent, Clips, Player)
 		ImprovedClipping.ClippedEntities[Ent] = nil
 		Ent:RemoveCallOnRemove("improved_clipping")
 
-		if SERVER then duplicator.ClearEntityModifier(Ent, "improved_clipping") end
+		if SERVER then
+			duplicator.ClearEntityModifier(Ent, "improved_clipping")
+
+			-- The compat copies Sync writes for other clipping addons (see clip_sv.lua)
+			duplicator.ClearEntityModifier(Ent, "proper_clipping")
+			duplicator.ClearEntityModifier(Ent, "clips")
+		end
 		ImprovedClipping.Sync(Ent)
 		hook.Run("ImprovedClipping_ClipsChanged", Ent)
 
@@ -326,6 +333,7 @@ function ImprovedClipping.SetClips(Ent, Clips, Player)
 				Clips = {},
 				NextID = 1,
 				OriginalConvexes = {},
+				OriginalOBBCenter = Ent.OBBCenterOrg or Ent:OBBCenter(),
 			}
 		else
 			local PhysObj = Ent:GetPhysicsObject()
@@ -341,6 +349,7 @@ function ImprovedClipping.SetClips(Ent, Clips, Player)
 				Clips = {},
 				NextID = 1,
 				OriginalConvexes = GetConvexes(PhysObj),
+				OriginalOBBCenter = Ent.OBBCenterOrg or Ent:OBBCenter(),
 			}
 		end
 

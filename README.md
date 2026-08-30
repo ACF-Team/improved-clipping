@@ -13,6 +13,8 @@ Inspired by prior clipping addons such as:
 - [Visual Clip Tool](https://steamcommunity.com/sharedfiles/filedetails/?id=106753151)
 - [Proper Clipping](https://steamcommunity.com/sharedfiles/filedetails/?id=2256491552)
 
+Clips are interchangeable with these addons, save for extra options we add like sealing.
+
 Server Convars:
 - `improved_clipping_max_clips`
     - Max clips an entity can have. Default 8, Min 0, Max 8.

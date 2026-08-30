@@ -47,6 +47,35 @@ function ImprovedClipping.SyncRemoval(Index)
 	net.Broadcast()
 end
 
+-- Saves the clips in the old addons' formats too so dupes from here load on their servers, both of them because Proper Clipping compares the two and errors when either is missing
+local function StoreCompatModifiers(Ent, State)
+	-- Measured from the center the entity had before we clipped it, which is the one the loading addon sees on a freshly spawned prop
+	local Center = State.OriginalOBBCenter
+	local Proper, Legacy = {}, {}
+
+	for i, Clip in ipairs(State.Clips) do
+		-- Measured from the origin with the normal already negated, our convention exactly, and every clip of ours is physical
+		Proper[i] = { Vector(Clip.Normal), Clip.Distance, Clip.Inside, true }
+
+		-- The older tools store an angle and an OBB center offset, measured off the rebuilt normal so their comparison stays exact
+		local Ang = Clip.Normal:Angle()
+
+		Legacy[i] = {
+			n = Ang,
+			d = Clip.Distance - Ang:Forward():Dot(Center),
+			inside = Clip.Inside,
+			new = true,
+		}
+	end
+
+	-- StoreEntityModifier merges into what is already there, so a shorter list would keep the old tail
+	duplicator.ClearEntityModifier(Ent, "proper_clipping")
+	duplicator.ClearEntityModifier(Ent, "clips")
+
+	duplicator.StoreEntityModifier(Ent, "proper_clipping", Proper)
+	duplicator.StoreEntityModifier(Ent, "clips", Legacy)
+end
+
 -- Stores the clips for the duplicator and networks them, batched per entity
 function ImprovedClipping.Sync(Ent)
 	timer.Create("improved_clipping_net_" .. Ent:EntIndex(), 0.1, 1, function()
@@ -63,12 +92,17 @@ function ImprovedClipping.Sync(Ent)
 				Insides[i] = Clip.Inside
 			end
 
+			-- Cleared first for the same reason as in StoreCompatModifiers above
+			duplicator.ClearEntityModifier(Ent, "improved_clipping")
+
 			duplicator.StoreEntityModifier(Ent, "improved_clipping", {
 				Normals = Normals,
 				Distances = Distances,
 				Seals = Seals,
 				Insides = Insides,
 			})
+
+			StoreCompatModifiers(Ent, State)
 		end
 
 		SendClips(Ent)
@@ -81,6 +115,8 @@ duplicator.RegisterEntityModifier("improved_clipping", function(Player, Ent, Dat
 	if not hook.Run("CanTool", Player, { Entity = Ent }, "improved_clipping") then
 		Player:ChatPrint(tostring(Ent) .. " will be spawned without clips (not allowed to clip).")
 		duplicator.ClearEntityModifier(Ent, "improved_clipping")
+		duplicator.ClearEntityModifier(Ent, "proper_clipping")
+		duplicator.ClearEntityModifier(Ent, "clips")
 
 		return
 	end

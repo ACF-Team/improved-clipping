@@ -172,6 +172,65 @@ return {
 		},
 
 		{
+			name = "Stores the clips in Proper Clipping's formats too",
+			async = true,
+			timeout = 5,
+			func = function(State)
+				local Cube = State.Cube
+
+				-- Rebuilding the physics moves OBBCenter, and the loading addon measures against the pre-clip one
+				local Center = Cube:OBBCenter()
+
+				ImprovedClipping.AddClips(Cube, { Vector(1, 0, 0) }, { 10 }, nil, { true })
+
+				timer.Simple(SyncDelay, function()
+					-- Proper Clipping's own format: normal, distance, inside, physics
+					local Proper = Cube.EntityMods and Cube.EntityMods.proper_clipping
+					expect(Proper).to.exist()
+					expect(#Proper).to.equal(1)
+					expect(Proper[1][1]).to.equal(Vector(1, 0, 0))
+					expect(Proper[1][2]).to.equal(10)
+					expect(Proper[1][3]).to.beTrue()
+					expect(Proper[1][4]).to.beTrue()
+
+					-- The older tools' format: an angle and a distance from the OBB center
+					local Legacy = Cube.EntityMods.clips
+					expect(Legacy).to.exist()
+					expect(#Legacy).to.equal(1)
+					expect(Legacy[1].n:Forward():IsEqualTol(Vector(1, 0, 0), 0.001)).to.beTrue()
+					expect(Near(Legacy[1].d, 10 - Center.x)).to.beTrue()
+					expect(Legacy[1].inside).to.beTrue()
+
+					-- Proper Clipping only trusts its own format while the two agree, so they have to convert into each other
+					expect(Near(Legacy[1].d + Legacy[1].n:Forward():Dot(Center), Proper[1][2])).to.beTrue()
+
+					done()
+				end)
+			end
+		},
+
+		{
+			name = "A pasted copy loads its own format once, not the compat copies as well",
+			async = true,
+			timeout = 5,
+			func = function(State)
+				local Cube = State.Cube
+				ImprovedClipping.AddClips(Cube, { Vector(1, 0, 0) }, { 0 })
+
+				timer.Simple(SyncDelay, function()
+					local Copy = Paste(Cube, State)
+
+					-- clip_compat.lua registers the same names and has to stand down here, or the clip lands twice
+					timer.Simple(0.1, function()
+						expect(#ImprovedClipping.GetClips(Copy)).to.equal(1)
+
+						done()
+					end)
+				end)
+			end
+		},
+
+		{
 			name = "A copy of a reset entity comes back unclipped",
 			async = true,
 			timeout = 5,
@@ -181,6 +240,9 @@ return {
 				ImprovedClipping.Reset(Cube)
 
 				timer.Simple(SyncDelay, function()
+					expect(Cube.EntityMods.proper_clipping).to.beNil()
+					expect(Cube.EntityMods.clips).to.beNil()
+
 					local Copy = Paste(Cube, State)
 
 					expect(Copy.ImprovedClipping).to.beNil()
