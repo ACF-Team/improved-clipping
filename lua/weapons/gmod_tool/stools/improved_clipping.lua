@@ -7,6 +7,7 @@ TOOL.ConfigName = ""
 TOOL.Information = {
 	{ name = "left0", stage = 0, op = 0 },
 	{ name = "left1", stage = 0, op = 1 },
+	{ name = "left2", stage = 0, op = 2 },
 	{ name = "right0", stage = 0 },
 	{ name = "reload0", stage = 0 },
 	{ name = "alt", stage = 0 },
@@ -19,6 +20,8 @@ local ConVarDefaults = {
 	["add_undo"]          = "1",
 	["mode"]              = "0",
 	["offset"]            = "0",
+	["pitch"]             = "0",
+	["yaw"]               = "0",
 }
 
 for Name, Default in pairs(ConVarDefaults) do TOOL.ClientConVar[Name] = Default end
@@ -87,12 +90,19 @@ local function ComputeClipPlane(Tool, Trace)
 	end
 end
 
+-- World-space plane for the angle-driven Pitch and Yaw mode: origin at the aimed entity, no clicks needed
+local function GetAnglePlane(Tool, Entity)
+	local Ang = Angle(Tool:GetClientNumber("pitch"), Tool:GetClientNumber("yaw"), 0)
+	return Ang:Forward(), Entity:GetPos()
+end
+
 if CLIENT then
 	language.Add("tool.improved_clipping.name", "Improved Clipping")
 	language.Add("tool.improved_clipping.desc", "Applies physical clips to props, changing their visuals/geometry")
 
 	language.Add("tool.improved_clipping.left0", "Define clipping planes. Last 2 planes used.")
 	language.Add("tool.improved_clipping.left1", "Define clipping plane")
+	language.Add("tool.improved_clipping.left2", "Adjust the Pitch/Yaw sliders in the tool panel to aim the plane")
 
 	language.Add("tool.improved_clipping.right0", "Add clip to selected entity")
 	language.Add("tool.improved_clipping.reload0", "Clear all clips on selected entity")
@@ -114,11 +124,30 @@ if CLIENT then
 
 		local Mode = Panel:ComboBox("Plane Mode", "improved_clipping_mode")
 		Mode:SetTooltip("How the clipping plane is determined from your hits")
-		Mode:AddChoice("Dual Hitplane Intersection", 0)
+		Mode:SetSortItems(false) -- DComboBox alphabetizes by default, which would scramble this list
 		Mode:AddChoice("Single Hitplane", 1)
+		Mode:AddChoice("Dual Hitplane Intersection", 0)
+		Mode:AddChoice("Pitch and Yaw", 2)
 
 		local Offset = Panel:NumSlider("Plane Offset", "improved_clipping_offset", -10, 10, 2)
 		Offset:SetTooltip("Shifts the clipping plane along its normal by this many units")
+
+		Panel:NumSlider("Pitch", "improved_clipping_pitch", -180, 180, 2)
+		local PitchRow = Panel.Items[#Panel.Items]
+
+		Panel:NumSlider("Yaw", "improved_clipping_yaw", -180, 180, 2)
+		local YawRow = Panel.Items[#Panel.Items]
+
+		-- Hide the row DForm wraps each item in, not just the slider, or its padding leaves a gap
+		local function UpdateAngleSliders(_, _, NewMode)
+			local Show = tonumber(NewMode) == 2
+			PitchRow:SetVisible(Show)
+			YawRow:SetVisible(Show)
+			Panel:InvalidateLayout()
+		end
+
+		UpdateAngleSliders(nil, nil, GetConVar("improved_clipping_mode"):GetInt())
+		cvars.AddChangeCallback("improved_clipping_mode", UpdateAngleSliders, "ImprovedClipping_AngleSliders")
 
 		local ResetButton = Panel:Button("Reset Values")
 		ResetButton:SetTooltip("Reset all of the above options to their default values")
@@ -156,8 +185,13 @@ if CLIENT then
 		local Shift = Player:KeyDown(IN_SPEED)
 
 		local Tool = Player:GetTool("improved_clipping")
-		local Normal = Tool and Tool.Normal
-		local Pos = Tool and Tool.Pos
+
+		local Normal, Pos
+		if Tool and Tool:GetClientNumber("mode", 0) == 2 then
+			if Entity then Normal, Pos = GetAnglePlane(Tool, Entity) end
+		elseif Tool then
+			Normal, Pos = Tool.Normal, Tool.Pos
+		end
 
 		local Invert = Player:KeyDown(IN_WALK) and -1 or 1
 		local Offset = Tool and Tool:GetClientNumber("offset") * Invert or 0
@@ -212,14 +246,21 @@ function TOOL:RightClick(Trace)
 	local Entity = GetClippingTarget(self:GetOwner(), Trace)
 	if not Entity then return false end
 
-	if not self.Normal or not self.Pos then return false end
+	local PlaneNormal, PlanePos
+	if self:GetClientNumber("mode", 0) == 2 then
+		PlaneNormal, PlanePos = GetAnglePlane(self, Entity)
+	else
+		PlaneNormal, PlanePos = self.Normal, self.Pos
+	end
+
+	if not PlaneNormal or not PlanePos then return false end
 
 	local Owner = self:GetOwner()
 	local Invert = Owner:KeyDown(IN_WALK) and -1 or 1
 
 	-- The preview plane in entity-local space, normal facing the kept (green) half
-	local WorldNormal = self.Normal * -Invert
-	local WorldPoint = self.Pos - self.Normal * self:GetClientNumber("offset")
+	local WorldNormal = PlaneNormal * -Invert
+	local WorldPoint = PlanePos - PlaneNormal * self:GetClientNumber("offset")
 	local Normal, Distance = ImprovedClipping.WorldToLocalPlane(Entity, WorldNormal, WorldPoint)
 
 	-- Sealing must be explicitly opted into via ImprovedClippingAllowSeal, e.g. by a deferred
