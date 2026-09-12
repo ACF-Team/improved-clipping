@@ -25,7 +25,7 @@ Client Convars:
 - `improved_clipping_add_undo`
     - Add clips to the undo list. Default 1.
 - `improved_clipping_mode`
-    - Tool mode (dual hitplane / single hitplane / pitch and yaw). Default 0.
+    - Tool mode (single hitplane / dual hitplane / pitch and yaw). Default 1.
 - `improved_clipping_offset`
     - Plane offset applied when clipping. Default 0.
 - `improved_clipping_pitch` / `improved_clipping_yaw`
