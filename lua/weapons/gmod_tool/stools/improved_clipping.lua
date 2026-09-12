@@ -57,12 +57,18 @@ local function GetClippingTarget(Player, Trace)
 	return Entity
 end
 
+-- Traces stop DIST_EPSILON short of whatever they hit, so a hit position sits that far off the
+-- surface along the hit normal. Planes are built from the surface itself, not the backed off hit.
+-- https://developer.valvesoftware.com/wiki/Team_Fortress_2/Scripting/Script_Functions/Constants
+local DIST_EPSILON = 0.03125
+
 -- Shared by both realms to compute the clip plane
 local function ComputeClipPlane(Tool, Trace)
 	local op = Tool:GetOperation()
+	local HitPos = Trace.HitPos - Trace.HitNormal * DIST_EPSILON
 
 	if op == 0 then
-		local Plane1 = { Origin = Trace.HitPos, Normal = Trace.HitNormal }
+		local Plane1 = { Origin = HitPos, Normal = Trace.HitNormal }
 		local Plane2 = Tool.LastPlane or Plane1
 		Tool.LastPlane = Plane1
 
@@ -75,9 +81,9 @@ local function ComputeClipPlane(Tool, Trace)
 			return Normal, Pos
 		end
 
-		return Trace.HitNormal, Trace.HitPos
+		return Trace.HitNormal, HitPos
 	elseif op == 1 then
-		return Trace.HitNormal, Trace.HitPos
+		return Trace.HitNormal, HitPos
 	end
 end
 
