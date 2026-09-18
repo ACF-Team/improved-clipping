@@ -129,7 +129,7 @@ if CLIENT then
 		Mode:AddChoice("Dual Hitplane Intersection", 0)
 		Mode:AddChoice("Pitch and Yaw", 2)
 
-		local Offset = Panel:NumSlider("Plane Offset", "improved_clipping_offset", -10, 10, 2)
+		local Offset = Panel:NumSlider("Plane Offset", "improved_clipping_offset", -100, 100, 2)
 		Offset:SetTooltip("Shifts the clipping plane along its normal by this many units")
 
 		Panel:NumSlider("Pitch", "improved_clipping_pitch", -180, 180, 2)
