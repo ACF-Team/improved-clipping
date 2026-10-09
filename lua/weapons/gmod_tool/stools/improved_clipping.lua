@@ -139,7 +139,11 @@ if CLIENT then
 		local YawRow = Panel.Items[#Panel.Items]
 
 		-- Hide the row DForm wraps each item in, not just the slider, or its padding leaves a gap
+		local CallbackID = "ImprovedClipping_AngleSliders" .. tostring(Panel)
+
 		local function UpdateAngleSliders(_, _, NewMode)
+			if not IsValid(PitchRow) or not IsValid(YawRow) then return timer.Simple(0, function() cvars.RemoveChangeCallback("improved_clipping_mode", CallbackID) end) end -- Not while cvars is still calling the callbacks
+
 			local Show = tonumber(NewMode) == 2
 			PitchRow:SetVisible(Show)
 			YawRow:SetVisible(Show)
@@ -147,7 +151,7 @@ if CLIENT then
 		end
 
 		UpdateAngleSliders(nil, nil, GetConVar("improved_clipping_mode"):GetInt())
-		cvars.AddChangeCallback("improved_clipping_mode", UpdateAngleSliders, "ImprovedClipping_AngleSliders")
+		cvars.AddChangeCallback("improved_clipping_mode", UpdateAngleSliders, CallbackID)
 
 		local ResetButton = Panel:Button("Reset Values")
 		ResetButton:SetTooltip("Reset all of the above options to their default values")
@@ -169,6 +173,22 @@ if CLIENT then
 			"2. Right click the prop to apply the clip."
 		)
 		Panel:AddItem(QuickstartLabel)
+
+		local HasPonder = Ponder ~= nil
+		local Tutorials = Panel:Button(HasPonder and "Open Tutorials" or "Tutorials need Ponder (click to get it)")
+		Tutorials:SetTooltip("Step by step tutorials on how to use this tool")
+
+		function Tutorials:DoClick()
+			if not HasPonder then return gui.OpenURL("https://steamcommunity.com/sharedfiles/filedetails/?id=3404950276") end
+
+			if not IsValid(Ponder.UIWindow) then
+				Ponder.UIWindow = vgui.Create("Ponder.UI")
+			else
+				Ponder.UIWindow:PonderShow()
+			end
+
+			Ponder.UIWindow:LoadAddonCategoriesIndex("improved_clipping", "tutorials")
+		end
 	end
 
 	local DrawOverlay = include("modules/visualizations.lua")()
