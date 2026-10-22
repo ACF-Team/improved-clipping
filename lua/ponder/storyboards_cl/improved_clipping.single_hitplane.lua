@@ -5,7 +5,7 @@ sb:WithPlaybackName("Single hitplane")
 sb:WithModelIcon("models/props_junk/wood_crate001a.mdl")
 sb:WithDescription("Use any surface as the plane, offset it, and use modifiers.")
 sb:SetPrimaryLanguage("en")
-sb:WithIndexOrder(4) -- Ponder lists the highest first
+sb:WithIndexOrder(5) -- Ponder lists the highest first
 
 local Model, BoxPos, Half, ToolPos = "models/hunter/blocks/cube1x1x1.mdl", Vector(0, 0, 40), 23.725, Vector(90, -90, 90)
 

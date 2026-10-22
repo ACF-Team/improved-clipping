@@ -39,7 +39,7 @@ function ClipOverlay:First(playback)
 
     -- The overlay draws the model itself, so Ponder's own draw is faded out until it ends
     model.PONDER_AlphaOverride = 0
-    env.ClipOverlay = {Model = model, Shift = self.Shift, Normal = self.Normal, Position = model:LocalToWorld(self.Normal * self.Distance)}
+    env.ClipOverlay = {Model = model, Shift = self.Shift, Normal = model:LocalToWorld(self.Normal) - model:GetPos(), Position = model:LocalToWorld(self.Normal * self.Distance)}
 end
 
 local EndClipOverlay = Ponder.API.NewInstruction("EndClipOverlay")
