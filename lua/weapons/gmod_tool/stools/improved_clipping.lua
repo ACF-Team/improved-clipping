@@ -65,6 +65,16 @@ end
 -- https://developer.valvesoftware.com/wiki/Team_Fortress_2/Scripting/Script_Functions/Constants
 local DIST_EPSILON = 0.03125
 
+-- Line where two planes cross, as a direction and the point nearest Plane1.Origin, or nil if parallel
+local function LineOfIntersection(Plane1, Plane2)
+	local Dir = Plane1.Normal:Cross(Plane2.Normal)
+	local LenSqr = Dir:LengthSqr()
+	if LenSqr <= 1e-10 then return nil end
+
+	local Point = Plane1.Origin + Dir:Cross(Plane1.Normal) * Plane2.Normal:Dot(Plane2.Origin - Plane1.Origin) / LenSqr
+	return Dir, Point
+end
+
 -- Shared by both realms to compute the clip plane
 local function ComputeClipPlane(Tool, Trace)
 	local op = Tool:GetOperation()
@@ -75,17 +85,38 @@ local function ComputeClipPlane(Tool, Trace)
 		local Plane2 = Tool.LastPlane or Plane1
 		Tool.LastPlane = Plane1
 
-		local LineNormal = Plane1.Normal:Cross(Plane2.Normal)
-		local LineLengthSqr = LineNormal:LengthSqr()
-
-		if LineLengthSqr > 1e-10 then -- Planes are not parallel
-			local Normal = LineNormal:Cross(Plane1.Normal + Plane2.Normal):GetNormalized()
-			local Pos = Plane1.Origin + LineNormal:Cross(Plane2.Normal) * Plane2.Normal:Dot(Plane2.Origin - Plane1.Origin) / LineLengthSqr
-			return Normal, Pos
+		local Dir, Point = LineOfIntersection(Plane1, Plane2)
+		if Dir then
+			return Dir:Cross(Plane1.Normal + Plane2.Normal):GetNormalized(), Point
 		end
 
 		return Trace.HitNormal, HitPos
 	elseif op == 1 then
+		return Trace.HitNormal, HitPos
+	elseif op == 3 then
+		local Plane = { Origin = HitPos, Normal = Trace.HitNormal }
+		local Queue = Tool.FourPlaneQueue or {}
+		Queue[#Queue + 1] = Plane
+		while #Queue > 4 do table.remove(Queue, 1) end
+		Tool.FourPlaneQueue = Queue
+
+		if #Queue == 4 then
+			-- L1 from P1 and P2, L2 from P3 and P4, Plane from L1 and L2.
+			local Dir1, Point1 = LineOfIntersection(Queue[1], Queue[2])
+			local Dir2, Point2 = LineOfIntersection(Queue[3], Queue[4])
+
+			if Dir1 and Dir2 then
+				local AvgDir = Dir1:GetNormalized() + Dir2:GetNormalized()
+				if AvgDir:LengthSqr() <= 1e-10 then AvgDir = Dir1 end
+
+				local Normal = AvgDir:Cross(Point2 - Point1)
+				if Normal:LengthSqr() > 1e-10 then
+					Normal:Normalize()
+					return Normal, Point1
+				end
+			end
+		end
+
 		return Trace.HitNormal, HitPos
 	end
 end
@@ -128,6 +159,7 @@ if CLIENT then
 		Mode:AddChoice("Single Hitplane", 1)
 		Mode:AddChoice("Dual Hitplane Intersection", 0)
 		Mode:AddChoice("Pitch and Yaw", 2)
+		Mode:AddChoice("4 Plane Intersection", 3)
 
 		local Offset = Panel:NumSlider("Plane Offset", "improved_clipping_offset", -100, 100, 2)
 		Offset:SetTooltip("Shifts the clipping plane along its normal by this many units")
