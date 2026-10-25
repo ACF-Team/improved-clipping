@@ -92,7 +92,7 @@ timer.Create("improved_clipping_pending", 0.1, 0, function()
 			Pending[Index] = nil
 
 			ErrorNoHalt(string.format(
-				"Improved Clipping: gave up clipping entity %d after %d attempts. Drawing it unclipped.\n",
+				"Improved Clipping: gave up clipping entity %d after %d attempts. PLEASE ENSURE YOU DO NOT HAVE MULTIPLE CLIPPING ADDONS INSTALLED.\n",
 				Index, MAX_ATTEMPTS
 			))
 		else
