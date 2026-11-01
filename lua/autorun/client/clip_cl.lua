@@ -77,23 +77,36 @@ local MAX_ATTEMPTS = 50
 
 local function ApplyClips(Index)
 	local Ent = Entity(Index)
-	if not IsValid(Ent) then return false end
+	if not IsValid(Ent) then return nil end
 	-- Wait for the spawn effect to end before clipping the entity
-	if Ent.SpawnEffect then return false end
+	if Ent.SpawnEffect then return false, "spawn effect still running" end
 
-	return ImprovedClipping.SetClips(Ent, Cache[Index])
+	local Clips = Cache[Index]
+	if ImprovedClipping.SetClips(Ent, Clips) then return true end
+
+	if hook.Run("ImprovedClipping_CanClip", Ent, Clips) == false then
+		return false, "ImprovedClipping_CanClip refused it"
+	end
+
+	if not Ent.ImprovedClippingExternalMesh and not IsValid(Ent:GetPhysicsObject()) then
+		return false, "no clientside physics object for " .. tostring(Ent:GetModel())
+	end
+
+	return false, "physics rebuild refused"
 end
 
 timer.Create("improved_clipping_pending", 0.1, 0, function()
 	for Index, Attempts in pairs(Pending) do
-		if ApplyClips(Index) then
+		local Applied, Reason = ApplyClips(Index)
+
+		if Applied ~= false then
 			Pending[Index] = nil
 		elseif Attempts >= MAX_ATTEMPTS then
 			Pending[Index] = nil
 
 			ErrorNoHalt(string.format(
-				"Improved Clipping: gave up clipping entity %d after %d attempts. PLEASE ENSURE YOU DO NOT HAVE MULTIPLE CLIPPING ADDONS INSTALLED.\n",
-				Index, MAX_ATTEMPTS
+				"Improved Clipping: gave up clipping %s after %d attempts: %s.\n",
+				tostring(Entity(Index)), MAX_ATTEMPTS, Reason
 			))
 		else
 			Pending[Index] = Attempts + 1
